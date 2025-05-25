@@ -204,8 +204,8 @@ def main(args):
         y_values = torch.tensor([train_dataset.dataset.get(idx).y for idx in train_dataset.indices])
         train_loss = ncodLoss(y_values, device, num_examp=len(train_dataset.indices),
                               num_classes=6,
-                              ratio_consistency=args.ratio_consitency, ratio_balance=args.ratio_balance,
-                              encoder_features=args.lastlayerdim, total_epochs=args.epochs)
+                              ratio_consistency=0, ratio_balance=0,
+                              encoder_features=300, total_epochs=args.epochs)
         if train_loss.USE_CUDA:
             train_loss.to(device)
 
@@ -267,6 +267,7 @@ if __name__ == "__main__":
     TRAIN_PATH = "datasets/B/train.json.gz"
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, default=TRAIN_PATH, help="Path to the training dataset (optional).")
+    parser.add_argument("--lr_u", type=str, default=1, help="lr u")
     parser.add_argument("--test_path", type=str, default=TEST_PATH, help="Path to the test dataset.")
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
