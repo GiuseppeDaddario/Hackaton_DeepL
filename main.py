@@ -33,7 +33,7 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
     for i, data in enumerate(tqdm(data_loader, desc="Iterating training graphs", unit="batch")):
         inputs, labels = data[0].to(device), data[0].y.to(device)
         target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
-        index_run = [train_dataset.indices[int(key)] for key in data[1]]
+        index_run = [train_dataset.indices[key] for key in data.batch.unique().tolist()]
 
         outs_sp, _ = model_sp(inputs)
         prediction = F.softmax(outs_sp, dim=1)
