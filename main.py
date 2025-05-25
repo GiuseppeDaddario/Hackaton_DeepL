@@ -91,11 +91,12 @@ def main(args):
                                   encoder_features=300, total_epochs=args.epochs)
             if train_loss.USE_CUDA:
                 train_loss.to(device)
+            optimizer_overparametrization = optim.SGD([train_loss.u], lr=args.lr_u)
         elif args.criterion == "ce":
             train_loss = torch.nn.CrossEntropyLoss()
 
 
-        optimizer_overparametrization = optim.SGD([train_loss.u], lr=args.lr_u)
+
 
         # Training loop
         num_epochs = args.epochs

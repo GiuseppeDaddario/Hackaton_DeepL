@@ -6,8 +6,11 @@ def train(train_acc_cater, train_loader, model, optimizer, device, optimizer_ove
     running_loss = 0.0
     correct_train = 0
     total_train = 0
+
     for i, data in enumerate(tqdm(train_loader, desc="Iterating training graphs", unit="batch")):
         inputs, labels = data.to(device), data.y.to(device)
+
+        # Per CrossEntropyLoss i label devono essere class indices, non one-hot
         target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
 
         # Estrai gli indici dei grafi nel batch
@@ -22,17 +25,28 @@ def train(train_acc_cater, train_loader, model, optimizer, device, optimizer_ove
         index_run = [dataset_obj.dict_index[idx] for idx in indices_batch]
 
         optimizer.zero_grad()
-        optimizer_overparametrization.zero_grad()
-        outputs, emb, _ = model(inputs)
-        loss = train_loss(index_run, outputs, target, emb, i, current_epoch,train_acc_cater)
-        loss.backward()
+        if optimizer_overparametrization is not None:
+            optimizer_overparametrization.zero_grad()
 
+        outputs, emb, _ = model(inputs)
+
+        # Scegli il tipo di loss in base al tipo di oggetto
+        if isinstance(train_loss, torch.nn.CrossEntropyLoss):
+            loss = train_loss(outputs, labels)  # labels deve essere shape (batch_size,)
+        else:
+            # ncodLoss o altra loss custom
+            loss = train_loss(index_run, outputs, target, emb, i, current_epoch, train_acc_cater)
+
+        loss.backward()
         optimizer.step()
-        optimizer_overparametrization.step()
+        if optimizer_overparametrization is not None:
+            optimizer_overparametrization.step()
+
         _, predicted = torch.max(outputs.data, 1)
         total_train += labels.size(0)
         correct_train += (predicted == labels.squeeze()).sum().item()
         running_loss += loss.item()
+
     train_acc_cater = correct_train / total_train
 
     # Save checkpoints if required
