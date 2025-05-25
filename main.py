@@ -34,22 +34,20 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
         inputs, labels = data.to(device), data.y.to(device)
         target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
 
-        indices_batch = []
-        if isinstance(data[1], (list, tuple)):
-            for item in data[1]:
-                if isinstance(item, (list, tuple)):
-                    indices_batch.extend(item)
-                else:
-                    indices_batch.append(item)
-        else:
-            indices_batch = data[1]
+        # Estrai gli indici dei grafi nel batch
+        indices_batch = data.batch.unique().tolist()
 
+        # Risali al dataset originale (in caso data_loader.dataset sia un Subset o simile)
+        dataset_obj = data_loader.dataset
+        while hasattr(dataset_obj, 'dataset'):
+            dataset_obj = dataset_obj.dataset
+
+        # Usa dict_index per tradurre gli indici batch in indici originali
+        index_run = [dataset_obj.dict_index[idx] for idx in indices_batch]
+
+        # Debug
         print("indices_batch:", indices_batch)
-        index_run = [
-            data_loader.dataset.dataset.dict_index[
-                int(idx[0] if isinstance(idx, (tuple, list)) else (idx.item() if isinstance(idx, torch.Tensor) else idx))
-            ] for idx in indices_batch
-        ]
+        print("index_run:", index_run)
 
 
         outs_sp, _, _ = model_sp(inputs)
