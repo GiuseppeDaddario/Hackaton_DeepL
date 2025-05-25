@@ -103,7 +103,7 @@ def main(args):
         train_acc_cater = 0.0
         print("Starting training...")
         for epoch in range(num_epochs):
-            (train_acc, training_loss), train_acc_cater = train(
+            train_acc, training_loss, train_acc_cater = train(
                 train_acc_cater,
                 train_loader,
                 model,
