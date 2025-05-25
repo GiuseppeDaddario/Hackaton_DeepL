@@ -35,7 +35,7 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
         target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
         index_run = [train_dataset.indices[key] for key in data.batch.unique().tolist()]
 
-        outs_sp, _ = model_sp(inputs)
+        outs_sp, _, _ = model_sp(inputs)
         prediction = F.softmax(outs_sp, dim=1)
         prediction = torch.sum((prediction * target), dim=1)
         train_loss.weight[index_run] = (prediction.detach()).view(-1, 1)
