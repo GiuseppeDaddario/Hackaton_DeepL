@@ -49,7 +49,8 @@ from torch_geometric.loader import DataLoader
 class GraphDataset(Dataset):
     def __init__(self, filename, transform=None, pre_transform=None):
         self.raw = filename
-        self.num_graphs, self.graphs_dicts = self._count_graphs() 
+        self.num_graphs, self.graphs_dicts = self._count_graphs()
+        self.dict_index = {i: i for i in range(self.num_graphs)}
         super().__init__(None, transform, pre_transform)
 
     def len(self):

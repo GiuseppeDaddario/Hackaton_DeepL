@@ -33,7 +33,19 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
     for i, data in enumerate(tqdm(data_loader, desc="Iterating training graphs", unit="batch")):
         inputs, labels = data.to(device), data.y.to(device)
         target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
-        index_run = [train_dataset.indices[key] for key in data.batch.unique().tolist()]
+
+        indices_batch = []
+        if isinstance(data[1], (list, tuple)):
+            for item in data[1]:
+                if isinstance(item, (list, tuple)):
+                    indices_batch.extend(item)
+                else:
+                    indices_batch.append(item)
+        else:
+            indices_batch = data[1]
+
+        index_run = [data_loader.dataset.dict_index[int(idx)] for idx in indices_batch]
+
 
         outs_sp, _, _ = model_sp(inputs)
         prediction = F.softmax(outs_sp, dim=1)
@@ -267,7 +279,7 @@ if __name__ == "__main__":
     TRAIN_PATH = "datasets/B/train.json.gz"
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, default=TRAIN_PATH, help="Path to the training dataset (optional).")
-    parser.add_argument("--lr_u", type=str, default=1, help="lr u")
+    parser.add_argument("--lr_u", type=float, default=1.0, help="lr u")
     parser.add_argument("--test_path", type=str, default=TEST_PATH, help="Path to the test dataset.")
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
