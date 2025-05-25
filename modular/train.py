@@ -1,5 +1,5 @@
 # train.py (solo la parte rilevante)
-
+import numpy as np
 import torch
 from tqdm import tqdm
 
