@@ -262,7 +262,7 @@ def main(args):
             print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {training_loss:.4f}, Train Acc: {train_accuracy:.4f}")
 
             # Salva i valori scalari in liste separate
-            train_losses.append(train_loss)
+            train_losses.append(training_loss)
             train_accuracies.append(train_accuracy)
             logging.info(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {training_loss:.4f}, Train Acc: {train_accuracy:.4f}")
 
