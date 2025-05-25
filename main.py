@@ -14,6 +14,9 @@ import torch.nn.functional as F
 from src.models import GNN
 from src.loss import ncodLoss
 
+from modular.train import train
+from modular.evaluation import evaluate
+from modular.statistics import save_predictions, plot_training_progress
 
 
 # Set the random seed
@@ -23,118 +26,6 @@ def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)
     return data
 
-def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimizer_overparametrization,train_loss, train_dataset, save_checkpoints, checkpoint_path, current_epoch):
-    model.train()
-    model_sp.train()
-
-    total_loss = 0
-    correct_train = 0
-    total_train = 0
-    for i, data in enumerate(tqdm(data_loader, desc="Iterating training graphs", unit="batch")):
-        inputs, labels = data.to(device), data.y.to(device)
-        target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
-
-        # Estrai gli indici dei grafi nel batch
-        indices_batch = data.batch.unique().tolist()
-
-        # Risali al dataset originale (in caso data_loader.dataset sia un Subset o simile)
-        dataset_obj = data_loader.dataset
-        while hasattr(dataset_obj, 'dataset'):
-            dataset_obj = dataset_obj.dataset
-
-        # Usa dict_index per tradurre gli indici batch in indici originali
-        index_run = [dataset_obj.dict_index[idx] for idx in indices_batch]
-
-
-        outs_sp, _, _ = model_sp(inputs)
-        prediction = F.softmax(outs_sp, dim=1)
-        prediction = torch.sum((prediction * target), dim=1)
-        train_loss.weight[index_run] = (prediction.detach()).view(-1, 1)
-
-        optimizer.zero_grad()
-        optimizer_overparametrization.zero_grad()
-        outputs, emb, _ = model(inputs)
-        loss = train_loss(index_run, outputs, target, emb, i, current_epoch,train_acc_cater)
-        loss.backward()
-        optimizer.step()
-        optimizer_overparametrization.step()
-        _, predicted = torch.max(outputs.data, 1)
-        total_train += labels.size(0)
-        correct_train += (predicted == labels.squeeze()).sum().item()
-        total_loss += loss.item()
-
-    train_acc_cater = correct_train / total_train
-
-    # Save checkpoints if required
-    if save_checkpoints:
-        checkpoint_file = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
-        torch.save(model.state_dict(), checkpoint_file)
-        print(f"Checkpoint saved at {checkpoint_file}")
-
-    loss_return = (correct_train / total_train) * 100, (total_loss / len(data_loader))
-    return loss_return, train_acc_cater
-
-def evaluate(data_loader, model, device, calculate_accuracy=False):
-    model.eval()
-    correct = 0
-    total = 0
-    predictions = []
-    with torch.no_grad():
-        for data in tqdm(data_loader, desc="Iterating eval graphs", unit="batch"):
-            data = data.to(device)
-            output = model(data)
-            pred = output[0].argmax(dim=1)
-            predictions.extend(pred.cpu().numpy())
-            if calculate_accuracy:
-                correct += (pred == data.y).sum().item()
-                total += data.y.size(0)
-    if calculate_accuracy:
-        accuracy = correct / total
-        return accuracy, predictions
-    return predictions
-
-def save_predictions(predictions, test_path):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    submission_folder = os.path.join(script_dir, "submission")
-    test_dir_name = os.path.basename(os.path.dirname(test_path))
-    
-    os.makedirs(submission_folder, exist_ok=True)
-    
-    output_csv_path = os.path.join(submission_folder, f"testset_{test_dir_name}.csv")
-    
-    test_graph_ids = list(range(len(predictions)))
-    output_df = pd.DataFrame({
-        "id": test_graph_ids,
-        "pred": predictions
-    })
-    
-    output_df.to_csv(output_csv_path, index=False)
-    print(f"Predictions saved to {output_csv_path}")
-
-
-def plot_training_progress(train_losses, train_accuracies, output_dir):
-    epochs = range(1, len(train_losses) + 1)
-    plt.figure(figsize=(12, 6))
-
-    # Plot loss
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_losses, label="Training Loss", color='blue')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Training Loss per Epoch')
-
-    # Plot accuracy
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, train_accuracies, label="Training Accuracy", color='green')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('Training Accuracy per Epoch')
-
-    # Save plots in the current directory
-    os.makedirs(output_dir, exist_ok=True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "training_progress.png"))
-    plt.close()
 
 def main(args):
     # Get the directory where the main script is located
