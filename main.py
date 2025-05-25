@@ -32,7 +32,7 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
     total_train = 0
     for i, data in enumerate(tqdm(data_loader, desc="Iterating training graphs", unit="batch")):
         inputs, labels = data[0].to(device), data[0].y.to(device)
-        target = torch.zeros(len(labels), args.num_classes).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
+        target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
         index_run = [train_dataset.dataset.dict_index[int(key)] for key in data[1]]
 
         outs_sp, _ = model_sp(inputs)
@@ -193,7 +193,7 @@ def main(args):
 
         classbins = []
         print("Preparing class bins for training dataset...")
-        for i in range(full_dataset.num_classes):
+        for i in range(6):
             indices = []
             for idx, graph in enumerate(full_dataset.graphs_dicts):
                 if graph["y"][0] == i:  # Controlla se la classe del grafo corrisponde a `i`
@@ -203,7 +203,7 @@ def main(args):
         print("Computing the ncod loss")
         y_values = torch.tensor([train_dataset.dataset.get(idx).y for idx in train_dataset.indices])
         train_loss = ncodLoss(y_values, device, num_examp=len(train_dataset.indices),
-                              num_classes=train_dataset.num_classes,
+                              num_classes=6,
                               ratio_consistency=args.ratio_consitency, ratio_balance=args.ratio_balance,
                               encoder_features=args.lastlayerdim, total_epochs=args.epochs)
         if train_loss.USE_CUDA:
