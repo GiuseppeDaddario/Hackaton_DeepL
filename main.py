@@ -94,6 +94,7 @@ def main(args):
             optimizer_overparametrization = optim.SGD([train_loss.u], lr=args.lr_u)
         elif args.criterion == "ce":
             train_loss = torch.nn.CrossEntropyLoss()
+            optimizer_overparametrization = None
 
 
 
