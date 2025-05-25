@@ -243,7 +243,7 @@ def main(args):
         train_acc_cater = 0.0
         print("Starting training...")
         for epoch in range(num_epochs):
-            (train_accuracy, training_loss), train_acc_cater = train(
+            (train_acc, training_loss), train_acc_cater = train(
                 train_acc_cater,
                 train_loader,
                 model,
@@ -257,14 +257,14 @@ def main(args):
                 checkpoint_path=os.path.join(checkpoints_folder, f"model_{test_dir_name}"),
                 current_epoch=epoch
             )
-            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+            #train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
 
-            print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {training_loss:.4f}, Train Acc: {train_accuracy:.4f}")
+            print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {training_loss:.4f}, Train Acc: {train_acc:.4f}")
 
             # Salva i valori scalari in liste separate
             train_losses.append(training_loss)
-            train_accuracies.append(train_accuracy)
-            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {training_loss:.4f}, Train Acc: {train_accuracy:.4f}")
+            train_accuracies.append(train_acc)
+            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {training_loss:.4f}, Train Acc: {train_acc:.4f}")
 
             # Save best model
             if train_acc > best_accuracy:
