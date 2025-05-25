@@ -243,7 +243,7 @@ def main(args):
         train_acc_cater = 0.0
         print("Starting training...")
         for epoch in range(num_epochs):
-            (train_accuracy, train_loss), train_acc_cater = train(
+            (train_accuracy, training_loss), train_acc_cater = train(
                 train_acc_cater,
                 train_loader,
                 model,
@@ -259,12 +259,12 @@ def main(args):
             )
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
 
-            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
+            print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {training_loss:.4f}, Train Acc: {train_accuracy:.4f}")
 
             # Salva i valori scalari in liste separate
             train_losses.append(train_loss)
             train_accuracies.append(train_accuracy)
-            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
+            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}")
 
             # Save best model
             if train_acc > best_accuracy:
