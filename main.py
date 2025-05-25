@@ -83,7 +83,7 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
         for data in tqdm(data_loader, desc="Iterating eval graphs", unit="batch"):
             data = data.to(device)
             output = model(data)
-            pred = output.argmax(dim=1)
+            pred = output[0].argmax(dim=1)
             predictions.extend(pred.cpu().numpy())
             if calculate_accuracy:
                 correct += (pred == data.y).sum().item()
