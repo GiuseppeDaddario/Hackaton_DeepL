@@ -164,6 +164,7 @@ class GNN_node(torch.nn.Module):
         print("x shape:", x.shape)
         print("x min:", x.min().item(), "x max:", x.max().item())
         print("embedding size:", self.node_encoder.num_embeddings)
+        x = x.to(self.node_encoder.weight.device)
         h_list = [self.node_encoder(x)]
         for layer in range(self.num_layer):
 
