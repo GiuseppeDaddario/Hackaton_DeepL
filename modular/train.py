@@ -1,112 +1,131 @@
-import torch
-from tqdm import tqdm
+# train.py (solo la parte rilevante)
 
 import torch
 from tqdm import tqdm
+
+# Assumiamo che eps sia definito globalmente o importato se necessario per il clamp di u
+eps = 1e-7 # Stesso eps usato nella classe gcodLoss
 
 def train(
         atrain_global_value,
         train_loader,
         model,
-        optimizer_model, # Rinominato per chiarezza
+        optimizer_model,
         device,
-        optimizer_loss_params, # Rinominato per chiarezza (per u di NCOD/GCOD)
-        loss_function_obj,    # Rinominato per chiarezza
+        optimizer_loss_params, # Ottimizzatore per i parametri di gcodLoss (u)
+        loss_function_obj,    # Istanza di gcodLoss
         save_checkpoints,
         checkpoint_path,
         current_epoch,
         criterion_type,
-        num_classes_dataset # Aggiunto per target_one_hot
+        num_classes_dataset,
+        lambda_l3_weight=0.3 # Aggiunto parametro per il peso di L3 nell'aggiornamento di theta
 ):
     model.train()
-    if hasattr(loss_function_obj, 'train'): # Alcune loss custom potrebbero avere modalità train/eval
-        loss_function_obj.train()
+    if hasattr(loss_function_obj, 'train'):
+        loss_function_obj.train() # Metti gcodLoss in modalità train se necessario (non sembra esserlo)
 
-    running_epoch_loss = 0.0
+    running_epoch_loss_display = 0.0 # Per il logging della loss combinata
     correct_samples_in_epoch = 0
     total_samples_in_epoch = 0
 
     for batch_idx, data_batch in enumerate(tqdm(train_loader, desc=f"Epoch {current_epoch+1} Training", unit="batch", leave=False)):
-        # 'data_batch' è l'oggetto Batch di PyG che contiene uno o più grafi
-        # e dovrebbe avere l'attributo 'original_idx' aggiunto nel tuo GraphDataset.get()
-
         graphs_in_batch = data_batch.to(device)
-        true_labels_int = graphs_in_batch.y.to(device) # Etichette intere (indici di classe)
-
-        if not hasattr(graphs_in_batch, 'original_idx'):
-            raise ValueError(
-                "L'oggetto 'data_batch' (Batch di PyG) deve avere un attributo 'original_idx'. "
-                "Assicurati di aggiungerlo nel metodo get() del tuo GraphDataset."
-            )
-        # Indici originali dei campioni nel batch, usati per NCOD/GCOD
+        true_labels_int = graphs_in_batch.y.to(device)
         batch_original_indices = graphs_in_batch.original_idx.view(-1).tolist()
-
-        # Preparazione target one-hot per loss NCOD/GCOD
         target_one_hot = torch.zeros(
             len(true_labels_int),
-            num_classes_dataset, # Usa il numero di classi passato
+            num_classes_dataset,
             device=device
         ).scatter_(1, true_labels_int.view(-1, 1).long(), 1)
 
-        # Azzera gradienti
-        optimizer_model.zero_grad()
-        if optimizer_loss_params is not None:
-            optimizer_loss_params.zero_grad()
+        # --- Forward pass del modello ---
+        # È importante che questo avvenga prima di azzerare i gradienti se i gradienti di u dipendono dal forward del modello
+        # (ma in questo caso, u è un parametro separato, e i suoi gradienti verranno da L2).
+        output_logits, graph_level_embeddings, _ = model(graphs_in_batch) # Output del modello θ
 
-        # Forward pass del modello
-        # Assumiamo che model(graphs_in_batch) restituisca (logits, graph_embeddings, node_embeddings)
-        output_logits, graph_level_embeddings, _ = model(graphs_in_batch)
-
-        # Calcolo della loss
-        current_batch_loss = 0
+        # --- Calcolo delle componenti della Loss ---
         if criterion_type == "ce":
-            current_batch_loss = loss_function_obj(output_logits, true_labels_int)
-        elif criterion_type == "ncod" or criterion_type == "gcod":
-            current_batch_loss = loss_function_obj(
-                batch_original_indices,    # Indici originali
-                output_logits,             # Logits dal modello
-                target_one_hot,            # Etichette one-hot
-                graph_level_embeddings,    # Embedding a livello di grafo
-                batch_idx,                 # Numero del batch corrente nell'epoca
-                current_epoch,             # Epoca corrente
-                atrain_global_value        # Accuratezza globale di training (atrain)
+            # Azzera gradienti per CE
+            optimizer_model.zero_grad()
+            loss_ce = loss_function_obj(output_logits, true_labels_int)
+            loss_ce.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer_model.step()
+            current_batch_loss_for_display = loss_ce.item()
+
+        elif criterion_type == "gcod": # o "ncod" se la logica è simile
+            # Chiamata al metodo che restituisce L1, L2, L3
+            l1_val, l2_val, l3_val = loss_function_obj.calculate_loss_components(
+                batch_original_indices,
+                output_logits,             # Logits da θ
+                target_one_hot,
+                graph_level_embeddings,    # Embedding da θ
+                batch_idx,
+                current_epoch,
+                atrain_global_value
             )
+
+            # --- Aggiornamento per i parametri del modello θ (Eq. 10: ∇θ(L1 + L3)) ---
+            optimizer_model.zero_grad()
+            loss_for_model_theta = l1_val + lambda_l3_weight * l3_val # Applica il peso a L3 qui
+            if torch.isnan(loss_for_model_theta).any() or torch.isinf(loss_for_model_theta).any():
+                print(f"Epoch {current_epoch+1}, Batch {batch_idx}: NaN/Inf in loss_for_model_theta ({loss_for_model_theta.item()}). Skipping model update.")
+                # Potresti voler saltare l'aggiornamento o gestire l'errore
+            else:
+                loss_for_model_theta.backward(retain_graph=True if optimizer_loss_params is not None else False) # retain_graph se L2 usa parti del grafo
+                # che sono state usate anche da L1 o L3 e
+                # che NON sono state detached.
+                # In questo caso, output_logits è usato da L1 e L3.
+                # L2 usa output_logits.detach().
+                # u_batch è usato da L1 e L2.
+                # Se L1 ha .backward(retain_graph=True) allora i buffer intermedi
+                # per calcolare i gradienti di u rispetto a L1 sono mantenuti.
+                # Ma vogliamo solo ∇u L2, non ∇u L1.
+                # Quindi è meglio fare backward separati senza retain_graph se possibile.
+                # Per essere sicuri, e data la struttura, è meglio
+                # azzerare i gradienti di u prima di L2.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer_model.step()
+
+            # --- Aggiornamento per i parametri u (Eq. 11: ∇u L2) ---
+            if optimizer_loss_params is not None:
+                optimizer_loss_params.zero_grad() # Azzera i gradienti di u PRIMA di L2.backward()
+                # per assicurarsi che solo L2 contribuisca ai gradienti di u.
+                if torch.isnan(l2_val).any() or torch.isinf(l2_val).any():
+                    print(f"Epoch {current_epoch+1}, Batch {batch_idx}: NaN/Inf in l2_val ({l2_val.item()}). Skipping u update.")
+                else:
+                    l2_val.backward() # Calcola i gradienti di L2 rispetto a u (e altri parametri se non detached)
+                # Clip dei gradienti specifici per i parametri della loss 'u'
+                torch.nn.utils.clip_grad_norm_(loss_function_obj.parameters(), max_norm=1.0) # Adatta max_norm se necessario
+                optimizer_loss_params.step()
+
+                # Clipping esplicito di u dopo l'aggiornamento per mantenerlo in [eps, 1-eps]
+                with torch.no_grad():
+                    loss_function_obj.u.data.clamp_(min=eps, max=1.0 - eps)
+
+            # Per il logging, puoi sommare le loss o usare una metrica specifica
+            current_batch_loss_for_display = (l1_val + l2_val + lambda_l3_weight * l3_val).item()
+            if np.isnan(current_batch_loss_for_display) or np.isinf(current_batch_loss_for_display):
+                print(f"Epoch {current_epoch+1}, Batch {batch_idx}: Combined loss is NaN/Inf. Logging as 0 for safety.")
+                current_batch_loss_for_display = 0 # Evita errori nel logging
         else:
             raise ValueError(f"Tipo di criterion '{criterion_type}' non supportato.")
 
-        # Backward pass e ottimizzazione
-        current_batch_loss.backward()
+        running_epoch_loss_display += current_batch_loss_for_display
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # Prova valori come 1.0, 5.0, 10.0
-        if optimizer_loss_params is not None:
-            # È importante clippare anche i gradienti dei parametri della loss (come 'u')
-            # Potresti aver bisogno di un max_norm diverso qui, a seconda della scala dei gradienti di 'u'
-            torch.nn.utils.clip_grad_norm_(loss_function_obj.parameters(), max_norm=1.0) # Prova anche 0.1, 0.5, 5.0
-
-        optimizer_model.step()
-        if optimizer_loss_params is not None:
-            optimizer_loss_params.step()
-            if hasattr(loss_function_obj, 'u'): # Controlla se l'attributo 'u' esiste
-                with torch.no_grad():
-                    current_eps_for_u_clamping = 1e-7
-                    loss_function_obj.u.data.clamp_(min=current_eps_for_u_clamping, max=1.0 - current_eps_for_u_clamping)
-
-        # Statistiche per l'accuratezza media dei batch nell'epoca
+        # Statistiche (invariate)
         with torch.no_grad():
             _, predicted_labels = torch.max(output_logits.data, 1)
             total_samples_in_epoch += true_labels_int.size(0)
             correct_samples_in_epoch += (predicted_labels == true_labels_int.squeeze()).sum().item()
 
-        running_epoch_loss += current_batch_loss.item()
-
-    # Calcolo medie per l'epoca
-    avg_epoch_loss = running_epoch_loss / len(train_loader) if len(train_loader) > 0 else 0.0
+    avg_epoch_loss = running_epoch_loss_display / len(train_loader) if len(train_loader) > 0 else 0.0
     avg_batch_accuracy_epoch = (correct_samples_in_epoch / total_samples_in_epoch) * 100 if total_samples_in_epoch > 0 else 0.0
 
-    # Salvataggio checkpoint (logica invariata)
-    if save_checkpoints: # save_checkpoints qui è un booleano (es. (epoch + 1 in checkpoint_intervals))
-        final_checkpoint_path = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth" # checkpoint_path è il prefisso
+    if save_checkpoints:
+        final_checkpoint_path = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
         torch.save(model.state_dict(), final_checkpoint_path)
-        print(f"Checkpoint saved at {final_checkpoint_path}")
+        # print(f"Checkpoint saved at {final_checkpoint_path}") # Rimuovi o commenta se troppo verboso
 
     return avg_batch_accuracy_epoch, avg_epoch_loss
