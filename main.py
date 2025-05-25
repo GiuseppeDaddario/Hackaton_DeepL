@@ -69,7 +69,7 @@ def main(args):
     else:
         raise ValueError('Invalid GNN type')
 
-    optimizer_model = torch.optim.Adam(model.parameters(), lr=0.001) # Rinominato per chiarezza
+    optimizer_model = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
 
     # Setup logging e checkpoint (invariati)
     test_dir_name = os.path.basename(os.path.dirname(args.test_path))

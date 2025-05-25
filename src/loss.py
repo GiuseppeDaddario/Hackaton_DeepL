@@ -155,15 +155,16 @@ class ncodLoss(nn.Module):
 
 
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import math
 
 # Small epsilon to prevent log(0) or division by zero
-eps = 1e-8
+# Un valore di eps più grande potrebbe aiutare con la stabilità dei log,
+# ma potrebbe anche mascherare problemi o alterare leggermente i calcoli.
+# Prova con 1e-7 o 1e-6 se 1e-8 continua a dare problemi con i log.
+eps = 1e-7
 
 class gcodLoss(nn.Module):
     def __init__(self, sample_labels_numpy, device, num_examp, num_classes, gnn_embedding_dim, total_epochs):
@@ -175,13 +176,14 @@ class gcodLoss(nn.Module):
         self.total_epochs = total_epochs
 
         self.u = nn.Parameter(torch.empty(num_examp, 1, dtype=torch.float32, device=device))
-        torch.nn.init.normal_(self.u, mean=1e-8, std=1e-9)
+        torch.nn.init.normal_(self.u, mean=1e-8, std=1e-9) # o torch.nn.init.constant_(self.u, 1e-8)
 
-        self.sample_labels_numpy = sample_labels_numpy # 1D numpy array of integer labels
+        self.sample_labels_numpy = sample_labels_numpy
         self.gnn_embedding_dim = gnn_embedding_dim
 
-        self.prev_gnn_embeddings = torch.rand((num_examp, gnn_embedding_dim), device=device)
-        self.class_centroids = torch.rand((num_classes, gnn_embedding_dim), device=device)
+        # Inizializzazione prev_gnn_embeddings e class_centroids
+        self.prev_gnn_embeddings = torch.rand((num_examp, gnn_embedding_dim), device=device) * 0.01 # Scala per valori più piccoli
+        self.class_centroids = torch.rand((num_classes, gnn_embedding_dim), device=device) * 0.01
 
         self.first_epoch_or_batch_init_centroid = True
 
@@ -190,9 +192,7 @@ class gcodLoss(nn.Module):
             self.class_indices_bins.append(np.where(self.sample_labels_numpy == i)[0])
 
     def _update_centroids(self):
-        # Using only "cleaner" samples (small u) for centroids.
-        percent_cleanest = 50 # Use 50% cleanest samples per class
-
+        percent_cleanest = 50
         with torch.no_grad():
             for i in range(self.num_classes):
                 class_specific_indices = self.class_indices_bins[i]
@@ -200,114 +200,136 @@ class gcodLoss(nn.Module):
                     self.class_centroids[i] = torch.randn(self.gnn_embedding_dim, device=self.device) * 0.01
                     continue
 
-                # Ensure indices are valid for self.u and self.prev_gnn_embeddings
                 valid_pytorch_indices = torch.tensor(class_specific_indices, device=self.device, dtype=torch.long)
-
                 class_u_values = self.u.detach()[valid_pytorch_indices].squeeze()
                 class_embeddings = self.prev_gnn_embeddings[valid_pytorch_indices]
 
-                if len(class_u_values.shape) == 0: # single sample in class
-                    class_u_values = class_u_values.unsqueeze(0)
-
-                if class_u_values.numel() == 0: # no samples for this class in current view
+                if class_u_values.numel() == 0:
                     self.class_centroids[i] = torch.randn(self.gnn_embedding_dim, device=self.device) * 0.01
                     continue
+                if class_u_values.ndim == 0: # Se c'è un solo campione, squeeze lo rende scalare
+                    class_u_values = class_u_values.unsqueeze(0)
 
                 num_to_take = max(1, int(len(class_u_values) * (percent_cleanest / 100.0)))
 
-                _, top_k_indices_in_class_subset = torch.topk(class_u_values, min(num_to_take, len(class_u_values)), largest=False)
+                # Assicurati che k in topk non sia maggiore del numero di elementi
+                k_for_topk = min(num_to_take, len(class_u_values))
+                if k_for_topk == 0 : # Se non ci sono u_values
+                    self.class_centroids[i] = torch.randn(self.gnn_embedding_dim, device=self.device) * 0.01
+                    continue
 
+                _, top_k_indices_in_class_subset = torch.topk(class_u_values, k_for_topk, largest=False)
                 clean_embeddings_for_class = class_embeddings[top_k_indices_in_class_subset]
 
                 if clean_embeddings_for_class.numel() > 0:
                     self.class_centroids[i] = torch.mean(clean_embeddings_for_class, dim=0)
-                else:
-                    self.class_centroids[i] = torch.mean(class_embeddings, dim=0) if class_embeddings.numel() > 0 else torch.randn(self.gnn_embedding_dim, device=self.device) * 0.01
+                elif class_embeddings.numel() > 0 : # Fallback se non ci sono "clean" samples
+                    self.class_centroids[i] = torch.mean(class_embeddings, dim=0)
+                else: # Fallback estremo
+                    self.class_centroids[i] = torch.randn(self.gnn_embedding_dim, device=self.device) * 0.01
+
 
     def _get_soft_labels(self, current_gnn_embeddings_batch):
         with torch.no_grad():
-            batch_emb_norm = current_gnn_embeddings_batch.norm(p=2, dim=1, keepdim=True) + eps
-            batch_emb_normalized = current_gnn_embeddings_batch / batch_emb_norm
+            # Normalizzazione per stabilità
+            batch_emb_norm = current_gnn_embeddings_batch.norm(p=2, dim=1, keepdim=True)
+            # Evita divisione per zero se la norma è zero (embedding tutti a zero)
+            batch_emb_normalized = current_gnn_embeddings_batch / (batch_emb_norm + eps)
 
-            centroids_norm = self.class_centroids.norm(p=2, dim=1, keepdim=True) + eps
-            centroids_normalized = self.class_centroids / centroids_norm
+            centroids_norm = self.class_centroids.norm(p=2, dim=1, keepdim=True)
+            centroids_normalized = self.class_centroids / (centroids_norm + eps)
 
             similarities = torch.mm(batch_emb_normalized, centroids_normalized.t())
             soft_labels = F.softmax(similarities, dim=1)
             return soft_labels
 
-    # Modifica della firma per corrispondere alla tua chiamata:
-    # index_run, outputs, target, emb, i, current_epoch, train_acc_cater (che ora sarà atrain)
+
     def forward(self, batch_original_indices, gnn_logits_batch, true_labels_batch_one_hot,
                 gnn_embeddings_batch, batch_iter_num, current_epoch, atrain_overall_accuracy):
-        # batch_original_indices: il tuo 'index_run'
-        # gnn_logits_batch: il tuo 'outputs'
-        # true_labels_batch_one_hot: il tuo 'target'
-        # gnn_embeddings_batch: il tuo 'emb'
-        # batch_iter_num: il tuo 'i' (numero iterazione batch)
-        # current_epoch: il tuo 'current_epoch'
-        # atrain_overall_accuracy: il tuo 'train_acc_cater' (ma ora rappresenta l'accuratezza globale)
 
-        if self.first_epoch_or_batch_init_centroid and current_epoch == 0 and batch_iter_num == 0:
-            # Aggiorna i centroidi solo una volta all'inizio del training,
-            # o più frequentemente se necessario (es. ogni epoca).
-            # Per ora, lo facciamo solo all'inizio della prima epoca.
-            # Assicurati che prev_gnn_embeddings sia popolato prima di chiamarlo
-            # Questo implica che potresti dover fare un forward pass iniziale o usare valori random.
-            # Data la logica, è meglio aggiornarli dopo che prev_gnn_embeddings è stato popolato.
-            # Quindi, sposteremo l'aggiornamento dopo aver memorizzato gli embedding.
-            pass
-
-
-        # Store current embeddings for future centroid updates
-        # Assicurati che batch_original_indices siano indici validi per self.prev_gnn_embeddings
         pytorch_batch_indices = torch.tensor(batch_original_indices, device=self.device, dtype=torch.long)
+
         with torch.no_grad():
+            # Controlla se gli embedding del GNN sono validi
+            if torch.isnan(gnn_embeddings_batch).any() or torch.isinf(gnn_embeddings_batch).any():
+                print(f"ERROR: NaN/Inf in gnn_embeddings_batch at Epoch {current_epoch}, Batch {batch_iter_num}")
             self.prev_gnn_embeddings[pytorch_batch_indices] = gnn_embeddings_batch.detach()
 
-        # Aggiorna i centroidi
         if self.first_epoch_or_batch_init_centroid and current_epoch == 0 and batch_iter_num == 0:
-            self._update_centroids() # Ora prev_gnn_embeddings ha i primi valori
-            self.first_epoch_or_batch_init_centroid = False # Aggiorna solo una volta
-        elif current_epoch > 0 and batch_iter_num == 0 : # Esempio: aggiorna all'inizio di ogni epoca successiva
             self._update_centroids()
-
+            self.first_epoch_or_batch_init_centroid = False
+        elif current_epoch > 0 and batch_iter_num == 0:
+            self._update_centroids()
 
         u_batch = self.u[pytorch_batch_indices]
 
         # --- L1: Modified Cross-Entropy Loss (Eq 4) ---
         soft_labels_target_batch = self._get_soft_labels(gnn_embeddings_batch)
-
         logit_modification = atrain_overall_accuracy * u_batch * true_labels_batch_one_hot
         modified_logits = gnn_logits_batch + logit_modification
-
-        l1_loss_per_sample = -torch.sum(soft_labels_target_batch * F.log_softmax(modified_logits, dim=1), dim=1)
+        log_probs_l1 = F.log_softmax(modified_logits, dim=1)
+        l1_loss_per_sample = -torch.sum(soft_labels_target_batch * log_probs_l1, dim=1)
         l1_loss = torch.mean(l1_loss_per_sample)
 
         # --- L2: Loss for updating 'u' (Eq 6) ---
         with torch.no_grad():
             pred_indices = torch.argmax(gnn_logits_batch, dim=1)
             predicted_labels_one_hot = F.one_hot(pred_indices, num_classes=self.num_classes).float()
-
         term_for_u_update = predicted_labels_one_hot + u_batch * true_labels_batch_one_hot - true_labels_batch_one_hot
         l2_loss = torch.mean(torch.sum(term_for_u_update**2, dim=1)) / self.num_classes
 
         # --- L3: Regularization for 'u' (Eq 8) ---
-        prob_true_class_from_logits = torch.sum(F.softmax(gnn_logits_batch.detach(), dim=1) * true_labels_batch_one_hot, dim=1)
-        prob_true_class = torch.clamp(prob_true_class_from_logits, eps, 1.0 - eps)
+        with torch.no_grad(): # detach gnn_logits_batch per non influenzare i gradienti del modello tramite L3
+            prob_true_class_from_logits = torch.sum(F.softmax(gnn_logits_batch.detach(), dim=1) * true_labels_batch_one_hot, dim=1)
 
-        clamped_u_batch_squeezed = torch.clamp(u_batch.squeeze(dim=1), min=eps)
-        u_transformed = torch.sigmoid(-torch.log(clamped_u_batch_squeezed))
-        u_transformed = torch.clamp(u_transformed, eps, 1.0 - eps)
+        prob_true_class = torch.clamp(prob_true_class_from_logits, min=eps, max=1.0 - eps)
 
-        dkl_per_sample = prob_true_class * torch.log(prob_true_class / u_transformed) + \
-                         (1 - prob_true_class) * torch.log((1 - prob_true_class) / (1 - u_transformed))
+        # Clamp u_batch in [eps, 1.0 - eps] per stabilità dei log
+        u_batch_squeezed_clamped_for_l3 = torch.clamp(u_batch.squeeze(dim=1), min=eps, max=1.0 - eps)
 
-        # Gestisci NaN in dkl_per_sample (può succedere se p o q sono esattamente 0 o 1 nonostante clamp)
-        dkl_per_sample = torch.nan_to_num(dkl_per_sample, nan=0.0, posinf=0.0, neginf=0.0)
+        # Calcolo di u_transformed secondo il paper: sigma(-log(u_B))
+        # Se u_B è piccolo (vicino a eps), -log(u_B) è grande e positivo, sigma -> 1
+        # Se u_B è grande (vicino a 1-eps), -log(u_B) è piccolo e positivo (vicino a -log(1)=0), sigma -> 0.5
+        log_of_clamped_u = torch.log(u_batch_squeezed_clamped_for_l3)
+        u_transformed = torch.sigmoid(-log_of_clamped_u)
+        u_transformed = torch.clamp(u_transformed, min=eps, max=1.0 - eps) # Clamp anche il risultato
+
+        # DKL(P||Q) = p*(log p - log q) + (1-p)*(log(1-p) - log(1-q))
+        log_prob_true_class = torch.log(prob_true_class) # p
+        log_1_minus_prob_true_class = torch.log(1.0 - prob_true_class) # 1-p
+
+        log_u_transformed = torch.log(u_transformed) # q
+        log_1_minus_u_transformed = torch.log(1.0 - u_transformed) # 1-q
+
+        term1_dkl = prob_true_class * (log_prob_true_class - log_u_transformed)
+        term2_dkl = (1.0 - prob_true_class) * (log_1_minus_prob_true_class - log_1_minus_u_transformed)
+
+        dkl_per_sample = term1_dkl + term2_dkl
+        dkl_per_sample = torch.nan_to_num(dkl_per_sample, nan=0.0, posinf=0.0, neginf=0.0) # Sostituisce NaN/Inf con 0.0
 
         l3_loss = torch.mean(dkl_per_sample) * (1.0 - atrain_overall_accuracy)
 
         total_loss = l1_loss + l2_loss + l3_loss
+
+        # --- DEBUG BLOCK ---
+        if torch.isnan(total_loss).any() or torch.isinf(total_loss).any() or \
+                torch.isnan(l1_loss).any() or torch.isinf(l1_loss).any() or \
+                torch.isnan(l2_loss).any() or torch.isinf(l2_loss).any() or \
+                torch.isnan(l3_loss).any() or torch.isinf(l3_loss).any():
+            print(f"\n--- DEBUG GCOD LOSS NaN/Inf Detected at Epoch {current_epoch}, Batch {batch_iter_num} ---")
+            print(f"atrain_overall_accuracy: {atrain_overall_accuracy:.4f}")
+            print(f"L1 Loss: {l1_loss.item():.4f}")
+            print(f"L2 Loss: {l2_loss.item():.4f}")
+            print(f"L3 Loss: {l3_loss.item():.4f}")
+            print(f"Total Loss: {total_loss.item():.4f}")
+
+            print(f"  Stats for u_batch (shape {u_batch.shape}): min={u_batch.min().item():.4e}, max={u_batch.max().item():.4e}, mean={u_batch.mean().item():.4e}, has_nan={torch.isnan(u_batch).any()}")
+            print(f"  Stats for gnn_logits_batch (shape {gnn_logits_batch.shape}): min={gnn_logits_batch.min().item():.4f}, max={gnn_logits_batch.max().item():.4f}, mean={gnn_logits_batch.mean().item():.4f}, has_nan={torch.isnan(gnn_logits_batch).any()}")
+            print(f"  Stats for prob_true_class (shape {prob_true_class.shape}): min={prob_true_class.min().item():.4f}, max={prob_true_class.max().item():.4f}, mean={prob_true_class.mean().item():.4f}, has_nan={torch.isnan(prob_true_class).any()}")
+            print(f"  Stats for u_batch_squeezed_clamped_for_l3 (shape {u_batch_squeezed_clamped_for_l3.shape}): min={u_batch_squeezed_clamped_for_l3.min().item():.4f}, max={u_batch_squeezed_clamped_for_l3.max().item():.4f}, mean={u_batch_squeezed_clamped_for_l3.mean().item():.4f}, has_nan={torch.isnan(u_batch_squeezed_clamped_for_l3).any()}")
+            print(f"  Stats for u_transformed (shape {u_transformed.shape}): min={u_transformed.min().item():.4f}, max={u_transformed.max().item():.4f}, mean={u_transformed.mean().item():.4f}, has_nan={torch.isnan(u_transformed).any()}")
+            print(f"  Stats for dkl_per_sample (shape {dkl_per_sample.shape}): min={dkl_per_sample.min().item():.4f}, max={dkl_per_sample.max().item():.4f}, mean={dkl_per_sample.mean().item():.4f}, has_nan={torch.isnan(dkl_per_sample).any()}")
+
+        # --- END DEBUG BLOCK ---
 
         return total_loss
