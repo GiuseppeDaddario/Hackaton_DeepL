@@ -31,7 +31,7 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
     correct_train = 0
     total_train = 0
     for i, data in enumerate(tqdm(data_loader, desc="Iterating training graphs", unit="batch")):
-        inputs, labels = data[0].to(device), data[0].y.to(device)
+        inputs, labels = data.to(device), data.y.to(device)
         target = torch.zeros(len(labels), 6).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
         index_run = [train_dataset.indices[key] for key in data.batch.unique().tolist()]
 
