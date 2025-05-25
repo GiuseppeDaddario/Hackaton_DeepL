@@ -44,7 +44,7 @@ class ncodLoss(nn.Module):
         torch.nn.init.normal_(self.u, mean=mean, std=std)
 
 
-    def forward(self, index, outputs, label, out, flag,train_acc_cater):
+    def forward(self, index, outputs, label, out, flag,train_acc_cater,_):
 
         if len(outputs) > len(index):
             output, output2 = torch.chunk(outputs, 2)
