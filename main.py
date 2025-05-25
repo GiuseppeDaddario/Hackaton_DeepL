@@ -45,10 +45,6 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
         # Usa dict_index per tradurre gli indici batch in indici originali
         index_run = [dataset_obj.dict_index[idx] for idx in indices_batch]
 
-        # Debug
-        print("indices_batch:", indices_batch)
-        print("index_run:", index_run)
-
 
         outs_sp, _, _ = model_sp(inputs)
         prediction = F.softmax(outs_sp, dim=1)
