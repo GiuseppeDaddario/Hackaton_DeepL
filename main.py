@@ -44,7 +44,7 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
         else:
             indices_batch = data[1]
 
-        index_run = [data_loader.dataset.dict_index[int(idx)] for idx in indices_batch]
+        index_run = [data_loader.dataset.dataset.dict_index[int(idx)] for idx in indices_batch]
 
 
         outs_sp, _, _ = model_sp(inputs)
