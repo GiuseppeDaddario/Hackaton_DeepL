@@ -2,8 +2,11 @@ import torch.nn.functional as F
 import torch
 import torch.nn as nn
 import numpy as np
+import math
 import copy
 import random
+
+from wassertein import torch_wasserstein_loss
 
 cross_entropy_val = nn.CrossEntropyLoss
 
@@ -29,10 +32,7 @@ class ncodLoss(nn.Module):
         self.prevSimilarity = torch.rand((num_examp, encoder_features),device=device)
         self.masterVector = torch.rand((num_classes, encoder_features),device=device)
         self.take = torch.zeros((num_examp, 1), device=device)
-
-        #added for test purpose only
-        self.weight = torch.zeros((num_examp, 1), device=device)
-
+        self.dirchilet = torch.zeros((num_examp, 1), device=device)
         self.sample_labels = sample_labels
         self.bins = []
 
@@ -46,7 +46,7 @@ class ncodLoss(nn.Module):
         torch.nn.init.normal_(self.u, mean=mean, std=std)
 
 
-    def forward(self, index, outputs, label, out, flag, epoch,train_acc_cater):
+    def forward(self, index, outputs, label, out, flag, epoch,train_acc_cater,_):
 
         if len(outputs) > len(index):
             output, output2 = torch.chunk(outputs, 2)
@@ -58,7 +58,7 @@ class ncodLoss(nn.Module):
         eps = 1e-4
 
         u = self.u[index]
-        weight = self.weight[index]
+
 
 
         if (flag == 0):
@@ -89,10 +89,9 @@ class ncodLoss(nn.Module):
         sim_mask = (similarity > 0.000).type(torch.float32)
         similarity = similarity * sim_mask
 
-
         u = u * label
         #train_acc_class = torch.sum((label*train_acc_class),dim=1).view(-1,1)
-        prediction = torch.clamp((prediction + ((1-weight)*u.detach())), min=eps, max=1.0)
+        prediction = torch.clamp((prediction + (train_acc_cater*u.detach())), min=eps, max=1.0)
         #added by me for the test purpose only
         # loss = torch.mean(-torch.sum((label) * torch.log(prediction), dim=1))
 
@@ -100,20 +99,17 @@ class ncodLoss(nn.Module):
 
         label_one_hot = self.soft_to_hard(output.detach())
 
-        MSE_loss = F.mse_loss((label_one_hot + (weight*u)), label, reduction='sum') / len(label)
+        MSE_loss = F.mse_loss((label_one_hot + u), label, reduction='sum') / len(label)
         loss += MSE_loss
         self.take[index] = torch.sum((label_one_hot * label), dim=1).view(-1, 1)
 
 
-        kl_loss = F.kl_div(
-            F.log_softmax(torch.sum((output * label), dim=1), dim=0),
-            F.softmax(-torch.log(self.u[index].detach().view(-1)), dim=0)
-        )
-# kl_loss = F.kl_div(F.log_softmax(-torch.log(self.u[index].detach().view(-1))),
+        kl_loss = F.kl_div(F.log_softmax(torch.sum((output * label),dim=1)),F.softmax(-torch.log(self.u[index].detach().view(-1))))
+        # kl_loss = F.kl_div(F.log_softmax(-torch.log(self.u[index].detach().view(-1))),
         #                    F.softmax(torch.sum((output * label), dim=1))
         #                    )
         # print('the kl loss is',kl_loss.item())
-        loss += kl_loss
+        loss += (1-train_acc_cater)*kl_loss
         # west_loss = torch_wasserstein_loss(F.log_softmax(-torch.log(self.u[index].detach().view(-1))),
         #                                    F.softmax(torch.sum((output * label), dim=1)))
         # print('the w loss is',west_loss.item())

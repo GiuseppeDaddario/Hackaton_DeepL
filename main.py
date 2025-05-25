@@ -1,23 +1,18 @@
 import argparse
+import logging
 import os
+
 import torch
 import torch.optim as optim
 from torch_geometric.loader import DataLoader
-from src.loadData import GraphDataset
-from src.utils import set_seed
-import pandas as pd
-import matplotlib.pyplot as plt
-import logging
-from tqdm import tqdm
-import torch.nn.functional as F
 
-from src.models import GNN
-from src.loss import ncodLoss
-
-from modular.train import train
 from modular.evaluation import evaluate
 from modular.statistics import save_predictions, plot_training_progress
-
+from modular.train import train
+from src.loadData import GraphDataset
+from src.loss import ncodLoss
+from src.models import GNN
+from src.utils import set_seed
 
 # Set the random seed
 set_seed()
@@ -25,7 +20,6 @@ set_seed()
 def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)
     return data
-
 
 def main(args):
     # Get the directory where the main script is located
@@ -36,7 +30,6 @@ def main(args):
     print("Building the model...")
     if args.gnn == 'gin':
         model = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-        model_sp = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
     elif args.gnn == 'gin-virtual':
         model = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
     elif args.gnn == 'gcn':
@@ -79,29 +72,19 @@ def main(args):
         print("Loading train dataset...")
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
-        classbins = []
-        print("Preparing class bins for training dataset...")
-        for i in range(6):
-            indices = []
-            for idx, graph in enumerate(train_dataset.graphs_dicts):
-                if graph["y"][0] == i:  # Controlla se la classe del grafo corrisponde a `i`
-                    indices.append(idx)
-            classbins.append(indices)
 
         print("Computing the ncod loss")
         y_values = torch.tensor([graph["y"][0] for graph in train_dataset.graphs_dicts])
-        train_loss = ncodLoss(y_values, device, num_examp=len(train_dataset),
-                              num_classes=6,
-                              ratio_consistency=0, ratio_balance=0,
-                              encoder_features=300, total_epochs=args.epochs)
-        if train_loss.USE_CUDA:
-            train_loss.to(device)
+        if args.criterion == "ncod":
+            train_loss = ncodLoss(y_values, device, num_examp=len(train_dataset),
+                                  num_classes=6,
+                                  ratio_consistency=0, ratio_balance=0,
+                                  encoder_features=300, total_epochs=args.epochs)
+            if train_loss.USE_CUDA:
+                train_loss.to(device)
+        elif args.criterion == "ce":
+            train_loss = torch.nn.CrossEntropyLoss()
 
-        pureIndices = []
-        noisyIndices = []
-        for x,z in zip(classbins, train_loss.shuffledbins):
-            noisyIndices.append(list(set(z) - set(x)))
-            pureIndices.append(list(set(z) - (set(z) - set(x))))
 
         optimizer_overparametrization = optim.SGD([train_loss.u], lr=args.lr_u)
 
@@ -124,12 +107,10 @@ def main(args):
                 train_acc_cater,
                 train_loader,
                 model,
-                model_sp,
                 optimizer,
                 device,
                 optimizer_overparametrization,
                 train_loss,
-                train_dataset,
                 save_checkpoints=(epoch + 1 in checkpoint_intervals),
                 checkpoint_path=os.path.join(checkpoints_folder, f"model_{test_dir_name}"),
                 current_epoch=epoch
@@ -172,6 +153,7 @@ if __name__ == "__main__":
     TRAIN_PATH = "datasets/B/train.json.gz"
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
+    parser.add_argument("--criterion", type=str, default="ncod", help="Type of loss to use")
     parser.add_argument("--lr_u", type=float, default=1.0, help="lr u")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
