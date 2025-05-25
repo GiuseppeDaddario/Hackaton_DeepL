@@ -1,78 +1,32 @@
-# import gzip
-# import json
-# import torch
-# from torch_geometric.data import Dataset, Data
-# import os
-# from tqdm import tqdm 
-# from torch_geometric.loader import DataLoader
-
-# class GraphDataset(Dataset):
-#     def __init__(self, filename, transform=None, pre_transform=None):
-#         self.raw = filename
-#         self.graphs = self.loadGraphs(self.raw)
-#         super().__init__(None, transform, pre_transform)
-
-#     def len(self):
-#         return len(self.graphs)
-
-#     def get(self, idx):
-#         return self.graphs[idx]
-
-#     @staticmethod
-#     def loadGraphs(path):
-#         print(f"Loading graphs from {path}...")
-#         print("This may take a few minutes, please wait...")
-#         with gzip.open(path, "rt", encoding="utf-8") as f:
-#             graphs_dicts = json.load(f)
-#         graphs = []
-#         for graph_dict in tqdm(graphs_dicts, desc="Processing graphs", unit="graph"):
-#             graphs.append(dictToGraphObject(graph_dict))
-#         return graphs
-
-
-
-# def dictToGraphObject(graph_dict):
-#     edge_index = torch.tensor(graph_dict["edge_index"], dtype=torch.long)
-#     edge_attr = torch.tensor(graph_dict["edge_attr"], dtype=torch.float) if graph_dict["edge_attr"] else None
-#     num_nodes = graph_dict["num_nodes"]
-#     y = torch.tensor(graph_dict["y"][0], dtype=torch.long) if graph_dict["y"] is not None else None
-#     return Data(edge_index=edge_index, edge_attr=edge_attr, num_nodes=num_nodes, y=y)
-
-
 
 import gzip
 import json
 import torch
 from torch_geometric.data import Dataset, Data
-from torch_geometric.loader import DataLoader
 
 class GraphDataset(Dataset):
     def __init__(self, filename, transform=None, pre_transform=None):
         self.raw = filename
-        self.num_graphs, self.graphs_dicts = self._count_graphs()
-        self.dict_index = {i: i for i in range(self.num_graphs)}
+        # Carica tutti i dizionari dei grafi una volta
+        with gzip.open(self.raw, "rt", encoding="utf-8") as f:
+            self.graphs_dicts_list = json.load(f)
+        self.num_graphs = len(self.graphs_dicts_list)
         super().__init__(None, transform, pre_transform)
 
     def len(self):
-        return self.num_graphs  
-    
-    def get(self, idx):
-        return dictToGraphObject(self.graphs_dicts[idx])
+        return self.num_graphs
 
-    def _count_graphs(self):
-        with gzip.open(self.raw, "rt", encoding="utf-8") as f:
-            graphs_dicts = json.load(f)  # Load full JSON array without keeping references
-            return len(graphs_dicts),graphs_dicts  # Return number of graphs
+    def get(self, idx): # idx qui è l'indice fornito dal DataLoader (dopo eventuale shuffle)
+        graph_dict = self.graphs_dicts_list[idx]
+        data_obj = dictToGraphObject(graph_dict)
+        data_obj.original_idx = torch.tensor([idx], dtype=torch.long) # Memorizza l'indice originale (o shufflato)
+        return data_obj
 
 def dictToGraphObject(graph_dict):
     edge_index = torch.tensor(graph_dict["edge_index"], dtype=torch.long)
-    edge_attr = torch.tensor(graph_dict["edge_attr"], dtype=torch.float) if graph_dict["edge_attr"] else None
+    edge_attr = torch.tensor(graph_dict["edge_attr"], dtype=torch.float) if graph_dict.get("edge_attr") else None # Usa .get per sicurezza
     num_nodes = graph_dict["num_nodes"]
-    y = torch.tensor(graph_dict["y"][0], dtype=torch.long) if graph_dict["y"] is not None else None
+    # Assicurati che y sia gestito correttamente se è None o vuoto
+    y_val = graph_dict.get("y")
+    y = torch.tensor(y_val[0], dtype=torch.long) if y_val and len(y_val) > 0 else None # Gestisci y vuoto o None
     return Data(edge_index=edge_index, edge_attr=edge_attr, num_nodes=num_nodes, y=y)
-
-
-
-
-
-
