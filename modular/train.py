@@ -23,7 +23,7 @@ def train(train_acc_cater, train_loader, model, optimizer, device, optimizer_ove
 
         optimizer.zero_grad()
         optimizer_overparametrization.zero_grad()
-        outputs, emb = model(inputs)
+        outputs, emb, _ = model(inputs)
         loss = train_loss(index_run, outputs, target, emb, i, current_epoch,train_acc_cater)
         loss.backward()
 
