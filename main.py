@@ -1,3 +1,5 @@
+## Imports
+
 import argparse
 import logging
 import os
@@ -6,9 +8,12 @@ import torch
 import torch.optim as optim
 from torch_geometric.loader import DataLoader
 
+## Modular imports
 from modular.evaluation import evaluate
 from modular.statistics import save_predictions, plot_training_progress
 from modular.train import train
+from modular.dataLoader import add_zeros
+
 from src.loadData import GraphDataset
 from src.loss import ncodLoss
 from src.models import GNN
@@ -17,9 +22,13 @@ from src.utils import set_seed
 # Set the random seed
 set_seed()
 
-def add_zeros(data):
-    data.x = torch.zeros(data.num_nodes, dtype=torch.long)
-    return data
+
+
+######################################################
+##                                                  ##
+##                   MAIN FUNCTION                  ##
+##                                                  ##
+######################################################
 
 def main(args):
     # Get the directory where the main script is located
@@ -147,6 +156,17 @@ def main(args):
     predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
     save_predictions(predictions, args.test_path)
     print("Predictions saved successfully.")
+
+######################################################
+##                                                  ##
+##               END OF MAIN FUNCTION               ##
+##                                                  ##
+######################################################
+
+
+
+
+
 
 if __name__ == "__main__":
     TEST_PATH = "datasets/B/test.json.gz"
