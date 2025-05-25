@@ -1,6 +1,7 @@
 import argparse
 import os
 import torch
+import torch.optim as optim
 from torch_geometric.loader import DataLoader
 from src.loadData import GraphDataset
 from src.utils import set_seed
@@ -8,8 +9,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import logging
 from tqdm import tqdm
+import torch.nn.functional as F
 
-from src.models import GNN 
+from src.models import GNN
+from src.loss import ncodLoss
+
+
 
 # Set the random seed
 set_seed()
@@ -18,17 +23,36 @@ def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)
     return data
 
-def train(data_loader, model, optimizer, criterion, device, save_checkpoints, checkpoint_path, current_epoch):
+def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimizer_overparametrization,train_loss, train_dataset, save_checkpoints, checkpoint_path, current_epoch):
     model.train()
+    model_sp.train()
+
     total_loss = 0
-    for data in tqdm(data_loader, desc="Iterating training graphs", unit="batch"):
-        data = data.to(device)
+    correct_train = 0
+    total_train = 0
+    for i, data in enumerate(tqdm(data_loader, desc="Iterating training graphs", unit="batch")):
+        inputs, labels = data[0].to(device), data[0].y.to(device)
+        target = torch.zeros(len(labels), args.num_classes).to(device).scatter_(1, labels.view(-1, 1).long(), 1)
+        index_run = [train_dataset.dataset.dict_index[int(key)] for key in data[1]]
+
+        outs_sp, _ = model_sp(inputs)
+        prediction = F.softmax(outs_sp, dim=1)
+        prediction = torch.sum((prediction * target), dim=1)
+        train_loss.weight[index_run] = (prediction.detach()).view(-1, 1)
+
         optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, data.y)
+        optimizer_overparametrization.zero_grad()
+        outputs, emb, _ = model(inputs)
+        loss = train_loss(index_run, outputs, target, emb, i, current_epoch,train_acc_cater)
         loss.backward()
         optimizer.step()
+        optimizer_overparametrization.step()
+        _, predicted = torch.max(outputs.data, 1)
+        total_train += labels.size(0)
+        correct_train += (predicted == labels.squeeze()).sum().item()
         total_loss += loss.item()
+
+    train_acc_cater = correct_train / total_train
 
     # Save checkpoints if required
     if save_checkpoints:
@@ -36,7 +60,8 @@ def train(data_loader, model, optimizer, criterion, device, save_checkpoints, ch
         torch.save(model.state_dict(), checkpoint_file)
         print(f"Checkpoint saved at {checkpoint_file}")
 
-    return total_loss / len(data_loader)
+    loss_return = (correct_train / total_train) * 100, (total_loss / len(data_loader))
+    return loss_return, train_acc_cater
 
 def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
@@ -105,11 +130,11 @@ def main(args):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
-    
-    
+
 
     if args.gnn == 'gin':
         model = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+        model_sp = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
     elif args.gnn == 'gin-virtual':
         model = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
     elif args.gnn == 'gcn':
@@ -119,6 +144,7 @@ def main(args):
     else:
         raise ValueError('Invalid GNN type')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer_sp = optim.Adam(model_sp.parameters(), lr=1)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Identify dataset folder (A, B, C, or D)
@@ -148,8 +174,41 @@ def main(args):
 
     # If train_path is provided, train the model
     if args.train_path:
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
+        full_dataset = GraphDataset(args.train_path, transform=add_zeros)
+
+        # Calcola le dimensioni per il training e la validation
+        train_size = int(0.8 * len(full_dataset))  # 80% per il training
+        val_size = len(full_dataset) - train_size  # 20% per la validation
+
+        # Dividi il dataset
+        train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+
+        # Crea i DataLoader per training e validation
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+
+        classbins = []
+        for i in range(full_dataset.num_classes):
+            indices = []
+            for idx, graph in enumerate(full_dataset.graphs_dicts):
+                if graph["y"][0] == i:  # Controlla se la classe del grafo corrisponde a `i`
+                    indices.append(idx)
+            classbins.append(indices)
+
+        train_loss = ncodLoss(train_dataset.dataset.y[train_dataset.indices],device, num_examp=len(train_dataset.indices),
+                              num_classes=train_dataset.num_classes,
+                              ratio_consistency=args.ratio_consitency, ratio_balance=args.ratio_balance,encoder_features=args.lastlayerdim,total_epochs=args.epochs)
+        if train_loss.USE_CUDA:
+            train_loss.to(device)
+
+        pureIndices = []
+        noisyIndices = []
+        for x,z in zip(classbins, train_loss.shuffledbins):
+            noisyIndices.append(list(set(z) - set(x)))
+            pureIndices.append(list(set(z) - (set(z) - set(x))))
+
+        optimizer_overparametrization = optim.SGD([train_loss.u], lr=args.lr_u)
+
 
         # Training loop
         num_epochs = args.epochs
@@ -163,20 +222,21 @@ def main(args):
         else:
             checkpoint_intervals = [num_epochs]
 
+        train_acc_cater = 0.0
         for epoch in range(num_epochs):
-            train_loss = train(
-                train_loader, model, optimizer, criterion, device,
+            training_loss, train_acc_cater = train(train_acc_cater,
+                train_loader, model, model_sp, optimizer, device, optimizer_overparametrization, train_loss, train_dataset,
                 save_checkpoints=(epoch + 1 in checkpoint_intervals),
                 checkpoint_path=os.path.join(checkpoints_folder, f"model_{test_dir_name}"),
                 current_epoch=epoch
             )
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {training_loss:.4f}, Train Acc: {train_acc:.4f}")
             
             # Save logs for training progress
-            train_losses.append(train_loss)
+            train_losses.append(training_loss)
             train_accuracies.append(train_acc)
-            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {training_loss:.4f}, Train Acc: {train_acc:.4f}")
 
             # Save best model
             if train_acc > best_accuracy:
@@ -193,9 +253,11 @@ def main(args):
     save_predictions(predictions, args.test_path)
 
 if __name__ == "__main__":
+    TEST_PATH = "datasets/B/test.json.gz"
+    TRAIN_PATH = "datasets/B/train.json.gz"
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
-    parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+    parser.add_argument("--train_path", type=str, default=TRAIN_PATH, help="Path to the training dataset (optional).")
+    parser.add_argument("--test_path", type=str, default=TEST_PATH, help="Path to the test dataset.")
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
     parser.add_argument('--device', type=int, default=1, help='which gpu to use if any (default: 0)')
     parser.add_argument('--gnn', type=str, default='gin', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')
