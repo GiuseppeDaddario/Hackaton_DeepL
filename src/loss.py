@@ -176,7 +176,9 @@ class gcodLoss(nn.Module):
         self.total_epochs = total_epochs
 
         self.u = nn.Parameter(torch.empty(num_examp, 1, dtype=torch.float32, device=device))
-        torch.nn.init.normal_(self.u, mean=1e-8, std=1e-9) # o torch.nn.init.constant_(self.u, 1e-8)
+        torch.nn.init.normal_(self.u, mean=0.0, std=1e-3)
+        with torch.no_grad():
+            self.u.data.clamp_(min=eps, max=1.0-eps)
 
         self.sample_labels_numpy = sample_labels_numpy
         self.gnn_embedding_dim = gnn_embedding_dim
@@ -215,6 +217,7 @@ class gcodLoss(nn.Module):
                 # Assicurati che k in topk non sia maggiore del numero di elementi
                 k_for_topk = min(num_to_take, len(class_u_values))
                 if k_for_topk == 0 : # Se non ci sono u_values
+                    print("Centroids reinitialized to random values due to empty class_u_values.")
                     self.class_centroids[i] = torch.randn(self.gnn_embedding_dim, device=self.device) * 0.01
                     continue
 
@@ -309,7 +312,8 @@ class gcodLoss(nn.Module):
 
         l3_loss = torch.mean(dkl_per_sample) * (1.0 - atrain_overall_accuracy)
 
-        total_loss = l1_loss + l2_loss + l3_loss
+        lambda_l3 = 0.5
+        total_loss = l1_loss + l2_loss + lambda_l3 * l3_loss
 
         # --- DEBUG BLOCK ---
         if torch.isnan(total_loss).any() or torch.isinf(total_loss).any() or \

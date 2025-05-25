@@ -76,9 +76,20 @@ def train(
 
         # Backward pass e ottimizzazione
         current_batch_loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # Prova valori come 1.0, 5.0, 10.0
+        if optimizer_loss_params is not None:
+            # È importante clippare anche i gradienti dei parametri della loss (come 'u')
+            # Potresti aver bisogno di un max_norm diverso qui, a seconda della scala dei gradienti di 'u'
+            torch.nn.utils.clip_grad_norm_(loss_function_obj.parameters(), max_norm=1.0) # Prova anche 0.1, 0.5, 5.0
+
         optimizer_model.step()
         if optimizer_loss_params is not None:
             optimizer_loss_params.step()
+            if hasattr(loss_function_obj, 'u'): # Controlla se l'attributo 'u' esiste
+                with torch.no_grad():
+                    current_eps_for_u_clamping = 1e-7
+                    loss_function_obj.u.data.clamp_(min=current_eps_for_u_clamping, max=1.0 - current_eps_for_u_clamping)
 
         # Statistiche per l'accuratezza media dei batch nell'epoca
         with torch.no_grad():

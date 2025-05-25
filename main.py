@@ -230,7 +230,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
     parser.add_argument("--criterion", type=str, default="ce", choices=["ce", "ncod", "gcod"], help="Type of loss to use (ce, ncod, gcod)") # Aggiunto gcod
-    parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in NCOD/GCOD") # Modificato default
+    parser.add_argument("--lr_u", type=float, default=0.0001, help="lr for u parameters in NCOD/GCOD") # Modificato default
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
     parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Save or not the predictions")
     parser.add_argument("--num_checkpoints", type=int, default=0, help="Number of intermediate checkpoints to save (0 for none, 1 for end only).") # Modificato help
