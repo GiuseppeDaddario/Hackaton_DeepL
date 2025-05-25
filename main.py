@@ -131,7 +131,7 @@ def main(args):
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
 
-
+    print("Building the model...")
     if args.gnn == 'gin':
         model = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
         model_sp = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
@@ -144,8 +144,7 @@ def main(args):
     else:
         raise ValueError('Invalid GNN type')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    optimizer_sp = optim.Adam(model_sp.parameters(), lr=1)
-    criterion = torch.nn.CrossEntropyLoss()
+    #criterion = torch.nn.CrossEntropyLoss()
 
     # Identify dataset folder (A, B, C, or D)
     test_dir_name = os.path.basename(os.path.dirname(args.test_path))
@@ -169,11 +168,14 @@ def main(args):
         print(f"Loaded best model from {checkpoint_path}")
 
     # Prepare test dataset and loader
+    print("Preparing test dataset...")
     test_dataset = GraphDataset(args.test_path, transform=add_zeros)
+    print("Loading test dataset...")
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # If train_path is provided, train the model
     if args.train_path:
+        print("Preparing train and valid datasets...")
         full_dataset = GraphDataset(args.train_path, transform=add_zeros)
 
         # Calcola le dimensioni per il training e la validation
@@ -184,10 +186,13 @@ def main(args):
         train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
 
         # Crea i DataLoader per training e validation
+        print("Loading train dataset...")
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        print("Loading validation dataset...")
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         classbins = []
+        print("Preparing class bins for training dataset...")
         for i in range(full_dataset.num_classes):
             indices = []
             for idx, graph in enumerate(full_dataset.graphs_dicts):
@@ -195,6 +200,7 @@ def main(args):
                     indices.append(idx)
             classbins.append(indices)
 
+        print("Computing the ncod loss")
         train_loss = ncodLoss(train_dataset.dataset.y[train_dataset.indices],device, num_examp=len(train_dataset.indices),
                               num_classes=train_dataset.num_classes,
                               ratio_consistency=args.ratio_consitency, ratio_balance=args.ratio_balance,encoder_features=args.lastlayerdim,total_epochs=args.epochs)
@@ -209,7 +215,6 @@ def main(args):
 
         optimizer_overparametrization = optim.SGD([train_loss.u], lr=args.lr_u)
 
-
         # Training loop
         num_epochs = args.epochs
         best_accuracy = 0.0
@@ -223,6 +228,7 @@ def main(args):
             checkpoint_intervals = [num_epochs]
 
         train_acc_cater = 0.0
+        print("Starting training...")
         for epoch in range(num_epochs):
             training_loss, train_acc_cater = train(train_acc_cater,
                 train_loader, model, model_sp, optimizer, device, optimizer_overparametrization, train_loss, train_dataset,
@@ -248,9 +254,11 @@ def main(args):
         plot_training_progress(train_losses, train_accuracies, os.path.join(logs_folder, "plots"))
 
     # Generate predictions for the test set using the best model
+    print("Generating predictions for the test set...")
     model.load_state_dict(torch.load(checkpoint_path))
     predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
     save_predictions(predictions, args.test_path)
+    print("Predictions saved successfully.")
 
 if __name__ == "__main__":
     TEST_PATH = "datasets/B/test.json.gz"
