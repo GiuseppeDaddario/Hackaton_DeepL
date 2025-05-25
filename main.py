@@ -201,9 +201,11 @@ def main(args):
             classbins.append(indices)
 
         print("Computing the ncod loss")
-        train_loss = ncodLoss(train_dataset.dataset.y[train_dataset.indices],device, num_examp=len(train_dataset.indices),
+        y_values = torch.tensor([train_dataset.dataset.get(idx).y for idx in train_dataset.indices])
+        train_loss = ncodLoss(y_values, device, num_examp=len(train_dataset.indices),
                               num_classes=train_dataset.num_classes,
-                              ratio_consistency=args.ratio_consitency, ratio_balance=args.ratio_balance,encoder_features=args.lastlayerdim,total_epochs=args.epochs)
+                              ratio_consistency=args.ratio_consitency, ratio_balance=args.ratio_balance,
+                              encoder_features=args.lastlayerdim, total_epochs=args.epochs)
         if train_loss.USE_CUDA:
             train_loss.to(device)
 
