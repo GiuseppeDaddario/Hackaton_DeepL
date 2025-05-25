@@ -286,9 +286,9 @@ if __name__ == "__main__":
     TEST_PATH = "datasets/B/test.json.gz"
     TRAIN_PATH = "datasets/B/train.json.gz"
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
-    parser.add_argument("--train_path", type=str, default=TRAIN_PATH, help="Path to the training dataset (optional).")
+    parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
     parser.add_argument("--lr_u", type=float, default=1.0, help="lr u")
-    parser.add_argument("--test_path", type=str, default=TEST_PATH, help="Path to the test dataset.")
+    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
     parser.add_argument('--gnn', type=str, default='gin', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')

@@ -105,8 +105,11 @@ class ncodLoss(nn.Module):
         self.take[index] = torch.sum((label_one_hot * label), dim=1).view(-1, 1)
 
 
-        kl_loss = F.kl_div(F.log_softmax(torch.sum((output * label),dim=1)),F.softmax(-torch.log(self.u[index].detach().view(-1))))
-        # kl_loss = F.kl_div(F.log_softmax(-torch.log(self.u[index].detach().view(-1))),
+        kl_loss = F.kl_div(
+            F.log_softmax(torch.sum((output * label), dim=1), dim=0),
+            F.softmax(-torch.log(self.u[index].detach().view(-1)), dim=0)
+        )
+# kl_loss = F.kl_div(F.log_softmax(-torch.log(self.u[index].detach().view(-1))),
         #                    F.softmax(torch.sum((output * label), dim=1))
         #                    )
         # print('the kl loss is',kl_loss.item())
