@@ -44,6 +44,7 @@ def train(train_acc_cater,data_loader, model,model_sp, optimizer, device,optimiz
         else:
             indices_batch = data[1]
 
+        print("indices_batch:", indices_batch)
         index_run = [
             data_loader.dataset.dataset.dict_index[
                 int(idx[0] if isinstance(idx, (tuple, list)) else (idx.item() if isinstance(idx, torch.Tensor) else idx))
