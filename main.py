@@ -142,20 +142,22 @@ def main(args):
         # Plot training progress in current directory
         plot_training_progress(train_losses, train_accuracies, os.path.join(logs_folder, "plots"))
 
-    train_dataset = 0
-    train_loader = 0
-    # Prepare test dataset and loader
-    print("Preparing test dataset...")
-    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
-    print("Loading test dataset...")
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    if args.predict == 1:
+        train_dataset = 0
+        train_loader = 0
+        # Prepare test dataset and loader
+        print("Preparing test dataset...")
+        test_dataset = GraphDataset(args.test_path, transform=add_zeros)
+        print("Loading test dataset...")
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
-    # Generate predictions for the test set using the best model
-    print("Generating predictions for the test set...")
-    model.load_state_dict(torch.load(checkpoint_path))
-    predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
-    save_predictions(predictions, args.test_path)
-    print("Predictions saved successfully.")
+        # Generate predictions for the test set using the best model
+        print("Generating predictions for the test set...")
+        model.load_state_dict(torch.load(checkpoint_path))
+        predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
+        save_predictions(predictions, args.test_path)
+        print("Predictions saved successfully.")
+
 
 ######################################################
 ##                                                  ##
@@ -176,6 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--criterion", type=str, default="ncod", help="Type of loss to use")
     parser.add_argument("--lr_u", type=float, default=1.0, help="lr u")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+    parser.add_argument("--predict", type=int, default=1, help="Save or not the predictions")
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
     parser.add_argument('--gnn', type=str, default='gin', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')
