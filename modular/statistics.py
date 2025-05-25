@@ -1,5 +1,7 @@
 import os
 import matplotlib.pyplot as plt
+import pandas as pd
+
 
 def save_predictions(predictions, test_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
