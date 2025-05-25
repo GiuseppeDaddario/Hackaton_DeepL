@@ -1,12 +1,63 @@
 import torch
 from torch_geometric.nn import MessagePassing
 import torch.nn.functional as F
-from torch_geometric.nn import global_mean_pool, global_add_pool
+from torch_geometric.nn import global_add_pool
 from torch_geometric.utils import degree
 
-import math
 
-### GIN convolution along the graph structure
+class GCNConv(MessagePassing):
+    def __init__(self, emb_dim):
+        super(GCNConv, self).__init__(aggr='add')
+
+        self.linear = torch.nn.Linear(emb_dim, emb_dim)
+        self.root_emb = torch.nn.Embedding(1, emb_dim)
+        # self.edge_encoder = torch.nn.Linear(7, emb_dim)
+        # self.edge_encoder = torch.nn.Linear(1, emb_dim)
+
+        #this line is added by me  remove after experiment
+        self.linear1 = torch.nn.Linear(emb_dim,emb_dim)
+
+
+    def forward(self, x, edge_index, edge_attr,train):
+
+        if train:
+            weight1 = self.linear1.weight.data
+            # weight1 = (weight1+ weight1.T)/2
+            eigenvalues1, eigenvectors1 = torch.linalg.eig(weight1)
+            real_eigenvalues = eigenvalues1.real
+            real_eigenvalues = torch.where(real_eigenvalues > 0, real_eigenvalues, torch.tensor(0.0, device=real_eigenvalues.device))
+            diag_real = torch.diag(real_eigenvalues)
+            weight1 = eigenvectors1.real @ diag_real @ torch.linalg.pinv(eigenvectors1.real)
+            self.linear1.weight.data = weight1
+
+        x = self.linear(x)
+        # edge_embedding = self.edge_encoder(edge_attr)
+        # edge_embedding = self.edge_encoder(edge_attr.view(-1,1))
+        row, col = edge_index
+
+        #edge_weight = torch.ones((edge_index.size(1), ), device=edge_index.device)
+        deg = degree(row, x.size(0), dtype = x.dtype) + 1
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+
+        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+        # this line is added by me again
+        # return self.linear1(self.propagate(edge_index, x=x, edge_attr = edge_embedding, norm=norm) + F.relu(x + self.root_emb.weight) * 1./deg.view(-1,1))
+
+        # return self.propagate(edge_index, x=x, edge_attr = edge_embedding, norm=norm) + F.relu(x + self.root_emb.weight) * 1./deg.view(-1,1)
+        return self.linear1(self.propagate(edge_index, x=x,  norm=norm))
+
+    # def message(self, x_j, edge_attr, norm):
+    #     return norm.view(-1, 1) * F.relu(x_j + edge_attr)
+
+
+    def message(self, x_j, norm):
+        return norm.view(-1, 1) * x_j
+
+    def update(self, aggr_out):
+        return aggr_out
+
+
 class GINConv(MessagePassing):
     def __init__(self, emb_dim):
         '''
@@ -15,14 +66,47 @@ class GINConv(MessagePassing):
 
         super(GINConv, self).__init__(aggr = "add")
 
-        self.mlp = torch.nn.Sequential(torch.nn.Linear(emb_dim, 2*emb_dim), torch.nn.BatchNorm1d(2*emb_dim), torch.nn.ReLU(), torch.nn.Linear(2*emb_dim, emb_dim))
+        self.mlp = torch.nn.Sequential(torch.nn.Linear(emb_dim, emb_dim), torch.nn.BatchNorm1d(emb_dim), torch.nn.ReLU(), torch.nn.Linear(emb_dim, emb_dim))
         self.eps = torch.nn.Parameter(torch.Tensor([0]))
 
         self.edge_encoder = torch.nn.Linear(7, emb_dim)
 
-    def forward(self, x, edge_index, edge_attr):
+    def forward(self, x, edge_index, edge_attr,train):
         edge_embedding = self.edge_encoder(edge_attr)
+
+
+        # if train:
+        #     weight1 = self.mlp[3].weight.data
+        #     eigenvalues1, eigenvectors1 = torch.linalg.eig(weight1)
+        #     real_eigenvalues = eigenvalues1.real
+        #     real_eigenvalues = torch.where(real_eigenvalues > 0, real_eigenvalues, torch.tensor(0.0, device=real_eigenvalues.device))
+        #     diag_real = torch.diag(real_eigenvalues)
+        #     weight1_real = eigenvectors1.real @ diag_real @ torch.linalg.pinv(eigenvectors1.real)
+        #     self.mlp[3].weight.data= weight1_real
+
+
+
+
+        # weight1 = self.mlp[3].weight.data
+        # eigenvalues1, eigenvectors1 = torch.linalg.eig(weight1)
+        # real_eigenvalues = eigenvalues1.real
+        # real_eigenvalues = torch.where(real_eigenvalues > 0, real_eigenvalues, torch.tensor(0.0, device=real_eigenvalues.device))
+        # diag_real = torch.diag(real_eigenvalues)
+        # weight1_real = eigenvectors1.real @ diag_real @ torch.linalg.pinv(eigenvectors1.real)
+        # self.mlp[3].weight.data= weight1_real
+
+        # weight1 = self.mlp[0].weight.data
+        # eigenvalues1, eigenvectors1 = torch.linalg.eig(weight1)
+        # real_eigenvalues = eigenvalues1.real
+        # real_eigenvalues = torch.where(real_eigenvalues > 0, real_eigenvalues, torch.tensor(0.0, device=real_eigenvalues.device))
+        # diag_real = torch.diag(real_eigenvalues)
+        # weight1_real = eigenvectors1.real @ diag_real @ torch.linalg.pinv(eigenvectors1.real)
+        # self.mlp[0].weight.data= weight1_real
+
+
+
         out = self.mlp((1 + self.eps) *x + self.propagate(edge_index, x=x, edge_attr=edge_embedding))
+
 
         return out
 
@@ -32,38 +116,7 @@ class GINConv(MessagePassing):
     def update(self, aggr_out):
         return aggr_out
 
-### GCN convolution along the graph structure
-class GCNConv(MessagePassing):
-    def __init__(self, emb_dim):
-        super(GCNConv, self).__init__(aggr='add')
 
-        self.linear = torch.nn.Linear(emb_dim, emb_dim)
-        self.root_emb = torch.nn.Embedding(1, emb_dim)
-        self.edge_encoder = torch.nn.Linear(7, emb_dim)
-
-    def forward(self, x, edge_index, edge_attr):
-        x = self.linear(x)
-        edge_embedding = self.edge_encoder(edge_attr)
-
-        row, col = edge_index
-
-        #edge_weight = torch.ones((edge_index.size(1), ), device=edge_index.device)
-        deg = degree(row, x.size(0), dtype = x.dtype) + 1
-        deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
-
-        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
-
-        return self.propagate(edge_index, x=x, edge_attr = edge_embedding, norm=norm) + F.relu(x + self.root_emb.weight) * 1./deg.view(-1,1)
-
-    def message(self, x_j, edge_attr, norm):
-        return norm.view(-1, 1) * F.relu(x_j + edge_attr)
-
-    def update(self, aggr_out):
-        return aggr_out
-
-
-### GNN to generate node embedding
 class GNN_node(torch.nn.Module):
     """
     Output:
@@ -87,7 +140,8 @@ class GNN_node(torch.nn.Module):
             raise ValueError("Number of GNN layers must be greater than 1.")
 
         self.node_encoder = torch.nn.Embedding(1, emb_dim) # uniform input node embedding
-
+        # self.node_encoder = FixedRepeatTransform()
+        # self.node_encoder =  torch.nn.Linear(1, emb_dim)
         ###List of GNNs
         self.convs = torch.nn.ModuleList()
         self.batch_norms = torch.nn.ModuleList()
@@ -102,7 +156,7 @@ class GNN_node(torch.nn.Module):
 
             self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
 
-    def forward(self, batched_data):
+    def forward(self, batched_data,train):
         x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
 
 
@@ -111,7 +165,7 @@ class GNN_node(torch.nn.Module):
         h_list = [self.node_encoder(x)]
         for layer in range(self.num_layer):
 
-            h = self.convs[layer](h_list[layer], edge_index, edge_attr)
+            h = self.convs[layer](h_list[layer], edge_index, edge_attr,train)
             h = self.batch_norms[layer](h)
 
             if layer == self.num_layer - 1:
@@ -134,7 +188,6 @@ class GNN_node(torch.nn.Module):
                 node_representation += h_list[layer]
 
         return node_representation
-
 
 ### Virtual GNN to generate node embedding
 class GNN_node_Virtualnode(torch.nn.Module):
@@ -183,7 +236,7 @@ class GNN_node_Virtualnode(torch.nn.Module):
 
         for layer in range(num_layer - 1):
             self.mlp_virtualnode_list.append(torch.nn.Sequential(torch.nn.Linear(emb_dim, 2*emb_dim), torch.nn.BatchNorm1d(2*emb_dim), torch.nn.ReLU(), \
-                                                    torch.nn.Linear(2*emb_dim, emb_dim), torch.nn.BatchNorm1d(emb_dim), torch.nn.ReLU()))
+                                                                 torch.nn.Linear(2*emb_dim, emb_dim), torch.nn.BatchNorm1d(emb_dim), torch.nn.ReLU()))
 
 
     def forward(self, batched_data):
@@ -233,3 +286,4 @@ class GNN_node_Virtualnode(torch.nn.Module):
                 node_representation += h_list[layer]
 
         return node_representation
+

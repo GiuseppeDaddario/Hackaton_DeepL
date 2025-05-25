@@ -1,15 +1,14 @@
 import torch
-from torch_geometric.nn import MessagePassing
-from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
 import torch.nn.functional as F
-from torch_geometric.nn.inits import uniform
+from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
 
-from src.conv import GNN_node, GNN_node_Virtualnode
+from conv import GNN_node, GNN_node_Virtualnode
+
 
 class GNN(torch.nn.Module):
 
-    def __init__(self, num_class, num_layer = 5, emb_dim = 300, 
-                    gnn_type = 'gin', virtual_node = True, residual = False, drop_ratio = 0.5, JK = "last", graph_pooling = "mean"):
+    def __init__(self, num_class, num_layer = 5, emb_dim = 300,
+                 gnn_type = 'gin', virtual_node = True, residual = False, drop_ratio = 0.5, JK = "last", graph_pooling = "mean"):
         '''
             num_tasks (int): number of labels to be predicted
             virtual_node (bool): whether to add virtual node or not
@@ -51,11 +50,14 @@ class GNN(torch.nn.Module):
         if graph_pooling == "set2set":
             self.graph_pred_linear = torch.nn.Linear(2*self.emb_dim, self.num_class)
         else:
+            self.graph_pred_linear1 = torch.nn.Linear(self.emb_dim, self.emb_dim)
             self.graph_pred_linear = torch.nn.Linear(self.emb_dim, self.num_class)
 
-    def forward(self, batched_data):
-        h_node = self.gnn_node(batched_data)
+    def forward(self, batched_data,train=False):
+        h_node = self.gnn_node(batched_data,train)
 
         h_graph = self.pool(h_node, batched_data.batch)
-
-        return self.graph_pred_linear(h_graph)
+        graph = F.relu(h_graph)
+        graph=self.graph_pred_linear1(graph)
+        graph = F.relu(graph)
+        return self.graph_pred_linear(graph),graph,h_node
