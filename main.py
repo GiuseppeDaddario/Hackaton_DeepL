@@ -178,35 +178,21 @@ def main(args):
         model.load_state_dict(torch.load(checkpoint_path))
         print(f"Loaded best model from {checkpoint_path}")
 
-    # Prepare test dataset and loader
-    print("Preparing test dataset...")
-    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
-    print("Loading test dataset...")
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # If train_path is provided, train the model
     if args.train_path:
         print("Preparing train and valid datasets...")
-        full_dataset = GraphDataset(args.train_path, transform=add_zeros)
-
-        # Calcola le dimensioni per il training e la validation
-        train_size = int(0.8 * len(full_dataset))  # 80% per il training
-        val_size = len(full_dataset) - train_size  # 20% per la validation
-
-        # Dividi il dataset
-        train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
 
         # Crea i DataLoader per training e validation
         print("Loading train dataset...")
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        print("Loading validation dataset...")
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         classbins = []
         print("Preparing class bins for training dataset...")
         for i in range(6):
             indices = []
-            for idx, graph in enumerate(full_dataset.graphs_dicts):
+            for idx, graph in enumerate(train_dataset.graphs_dicts):
                 if graph["y"][0] == i:  # Controlla se la classe del grafo corrisponde a `i`
                     indices.append(idx)
             classbins.append(indices)
@@ -274,6 +260,14 @@ def main(args):
 
         # Plot training progress in current directory
         plot_training_progress(train_losses, train_accuracies, os.path.join(logs_folder, "plots"))
+
+    train_dataset = 0
+    train_loader = 0
+    # Prepare test dataset and loader
+    print("Preparing test dataset...")
+    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
+    print("Loading test dataset...")
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     # Generate predictions for the test set using the best model
     print("Generating predictions for the test set...")
