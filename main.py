@@ -193,7 +193,7 @@ def main(args):
             )
 
             print(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}")
-            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain (if used): {atrain_global if args.criterion in ['ncod', 'gcod'] else 'N/A' :.4f}")
+            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain (if used): {atrain_global if args.criterion in ['ncod', 'gcod'] else 'N/A'}")
 
 
             train_losses_history.append(epoch_loss_avg)
