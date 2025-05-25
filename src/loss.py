@@ -5,7 +5,6 @@ import numpy as np
 import copy
 import random
 
-
 cross_entropy_val = nn.CrossEntropyLoss
 
 mean = 1e-8
@@ -25,11 +24,17 @@ class ncodLoss(nn.Module):
 
         self.u = nn.Parameter(torch.empty(num_examp, 1, dtype=torch.float32))
         self.init_param(mean=mean,std=std)
+
+        self.beginning = True
+        self.prevSimilarity = torch.rand((num_examp, encoder_features),device=device)
+        self.masterVector = torch.rand((num_classes, encoder_features),device=device)
         self.take = torch.zeros((num_examp, 1), device=device)
+
+        #added for test purpose only
+        self.weight = torch.zeros((num_examp, 1), device=device)
+
         self.sample_labels = sample_labels
         self.bins = []
-        self.threshold=torch.ones((num_examp), device=device)
-
 
         for i in range(0, num_classes):
             self.bins.append(np.where(self.sample_labels == i)[0])
@@ -53,45 +58,63 @@ class ncodLoss(nn.Module):
         eps = 1e-4
 
         u = self.u[index]
-
+        weight = self.weight[index]
 
 
         if (flag == 0):
-            if epoch>1:
-                if epoch< (self.total_epochs-10):
-                    p = int(20+ (80/(self.total_epochs-11))*(epoch-1))
-                else:
-                    p= 100
-                net_u = self.u.detach()[:]
-                p = int((len(net_u) / 100) * p)
-                ind_threshold = torch.topk(net_u, p, largest=False, dim=0)[1][-1].item()
-                value=net_u[ind_threshold]
-                self.threshold =(net_u <= value).type(torch.float).view(-1)
+            if self.beginning:
+                # percent = math.ceil((50 - (50 / self.total_epochs) * epoch) + 50)
+                percent= 100
+                for i in range(0, len(self.bins)):
+                    class_u = self.u.detach()[self.bins[i]]
+                    bottomK = int((len(class_u) / 100) * percent)
+                    important_indexs = torch.topk(class_u, bottomK, largest=False, dim=0)[1]
+                    self.masterVector[i] = torch.mean(self.prevSimilarity[self.bins[i]][important_indexs.view(-1)],
+                                                      dim=0)
 
+            masterVector_norm = self.masterVector.norm(p=2, dim=1, keepdim=True)
+            masterVector_normalized = self.masterVector.div(masterVector_norm)
+            self.masterVector_transpose = torch.transpose(masterVector_normalized, 0, 1)
+            self.beginning = True
 
+        self.prevSimilarity[index] = out1.detach()
 
-        mul = self.threshold[index].view(-1,1)
         prediction = F.softmax(output, dim=1)
 
-        similarity= label*mul
+        out_norm = out1.detach().norm(p=2, dim=1, keepdim=True)
+        out_normalized = out1.detach().div(out_norm)
+
+        similarity = torch.mm(out_normalized, self.masterVector_transpose)
+        similarity = similarity * label
+        sim_mask = (similarity > 0.000).type(torch.float32)
+        similarity = similarity * sim_mask
+
+
         u = u * label
+        #train_acc_class = torch.sum((label*train_acc_class),dim=1).view(-1,1)
+        prediction = torch.clamp((prediction + ((1-weight)*u.detach())), min=eps, max=1.0)
+        #added by me for the test purpose only
+        # loss = torch.mean(-torch.sum((label) * torch.log(prediction), dim=1))
 
-
-        prediction = torch.clamp((prediction + (train_acc_cater*u.detach())), min=eps, max=1.0)
-
-        loss = torch.sum(-torch.sum((similarity) * torch.log(prediction), dim=1))/torch.sum(mul)
+        loss = torch.mean(-torch.sum((similarity) * torch.log(prediction), dim=1))
 
         label_one_hot = self.soft_to_hard(output.detach())
 
-        MSE_loss = F.mse_loss((label_one_hot + u), label, reduction='sum') / len(label)
+        MSE_loss = F.mse_loss((label_one_hot + (weight*u)), label, reduction='sum') / len(label)
         loss += MSE_loss
         self.take[index] = torch.sum((label_one_hot * label), dim=1).view(-1, 1)
 
 
         kl_loss = F.kl_div(F.log_softmax(torch.sum((output * label),dim=1)),F.softmax(-torch.log(self.u[index].detach().view(-1))))
-
-        loss += (1-train_acc_cater)*kl_loss
-
+        # kl_loss = F.kl_div(F.log_softmax(-torch.log(self.u[index].detach().view(-1))),
+        #                    F.softmax(torch.sum((output * label), dim=1))
+        #                    )
+        # print('the kl loss is',kl_loss.item())
+        loss += kl_loss
+        # west_loss = torch_wasserstein_loss(F.log_softmax(-torch.log(self.u[index].detach().view(-1))),
+        #                                    F.softmax(torch.sum((output * label), dim=1)))
+        # print('the w loss is',west_loss.item())
+        # loss += west_loss
 
 
         if self.ratio_balance > 0:
