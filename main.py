@@ -199,7 +199,7 @@ def main(args):
 
         print("Computing the ncod loss")
         y_values = torch.tensor([graph["y"][0] for graph in train_dataset.graphs_dicts])
-        train_loss = ncodLoss(y_values, device, num_examp=len(train_dataset.indices),
+        train_loss = ncodLoss(y_values, device, num_examp=len(train_dataset),
                               num_classes=6,
                               ratio_consistency=0, ratio_balance=0,
                               encoder_features=300, total_epochs=args.epochs)
