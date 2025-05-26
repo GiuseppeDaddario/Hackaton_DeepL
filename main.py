@@ -4,7 +4,7 @@ import logging
 import os
 import torch
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch_geometric.loader import DataLoader
 import numpy as np
 from tqdm import tqdm
 
