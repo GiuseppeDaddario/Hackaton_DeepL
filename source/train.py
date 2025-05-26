@@ -2,6 +2,7 @@
 import numpy as np
 import torch
 from tqdm import tqdm
+import torch_xla.core.xla_model as xm
 
 # Assumiamo che eps sia definito globalmente o importato se necessario per il clamp di u
 eps = 1e-7 # Stesso eps usato nella classe gcodLoss
@@ -21,6 +22,7 @@ def train(
         num_classes_dataset,
         lambda_l3_weight,
         epoch_boost,
+        loss_fn_ce,
         is_tpu=False  # Parametro aggiunto per TPU
 ):
     model.train()
@@ -51,7 +53,7 @@ def train(
 
             # Usa xm.optimizer_step per TPU
             if is_tpu:
-                import torch_xla.core.xla_model as xm
+
                 xm.optimizer_step(optimizer_model)
                 xm.mark_step()
             else:
@@ -62,14 +64,12 @@ def train(
         elif criterion_type == "gcod":
             if current_epoch < epoch_boost:
                 optimizer_model.zero_grad()
-                loss_fn_ce = torch.nn.CrossEntropyLoss()
                 loss_ce = loss_fn_ce(output_logits, true_labels_int)
                 loss_ce.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
                 # Usa xm.optimizer_step per TPU
                 if is_tpu:
-                    import torch_xla.core.xla_model as xm
                     xm.optimizer_step(optimizer_model)
                     xm.mark_step()
                 else:
@@ -97,7 +97,6 @@ def train(
 
                     # Usa xm.optimizer_step per TPU
                     if is_tpu:
-                        import torch_xla.core.xla_model as xm
                         xm.optimizer_step(optimizer_model)
                     else:
                         optimizer_model.step()
@@ -113,7 +112,6 @@ def train(
 
                     # Usa xm.optimizer_step per TPU
                     if is_tpu:
-                        import torch_xla.core.xla_model as xm
                         xm.optimizer_step(optimizer_loss_params)
                     else:
                         optimizer_loss_params.step()
@@ -125,7 +123,6 @@ def train(
 
                 # Marca il passaggio per TPU
                 if is_tpu:
-                    import torch_xla.core.xla_model as xm
                     xm.mark_step()
 
                 current_batch_loss_for_display = (l1_val + l2_val + lambda_l3_weight * l3_val).item()
@@ -144,7 +141,6 @@ def train(
             correct_samples_in_epoch += (predicted_labels == true_labels_int.squeeze()).sum().item()
             # Aggiungi mark_step per TPU dopo operazioni statistiche
             if is_tpu:
-                import torch_xla.core.xla_model as xm
                 xm.mark_step()
 
     avg_epoch_loss = running_epoch_loss_display / len(train_loader) if len(train_loader) > 0 else 0.0
@@ -154,7 +150,6 @@ def train(
         final_checkpoint_path = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
         # Usa xm.save per TPU
         if is_tpu:
-            import torch_xla.core.xla_model as xm
             xm.save(model.state_dict(), final_checkpoint_path)
         else:
             torch.save(model.state_dict(), final_checkpoint_path)

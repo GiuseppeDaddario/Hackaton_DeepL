@@ -16,11 +16,16 @@ class GraphDataset(Dataset):
     def len(self):
         return self.num_graphs
 
-    def get(self, idx): # idx qui è l'indice fornito dal DataLoader (dopo eventuale shuffle)
+    def get(self, idx):
         graph_dict = self.graphs_dicts_list[idx]
         data_obj = dictToGraphObject(graph_dict)
-        data_obj.original_idx = torch.tensor([idx], dtype=torch.long) # Memorizza l'indice originale (o shufflato)
-        return data_obj
+        return {
+            "edge_index": data_obj.edge_index,
+            "edge_attr": data_obj.edge_attr,
+            "num_nodes": data_obj.num_nodes,
+            "y": data_obj.y,
+            "original_idx": torch.tensor([idx], dtype=torch.long)
+        }
 
 def dictToGraphObject(graph_dict):
     edge_index = torch.tensor(graph_dict["edge_index"], dtype=torch.long)
