@@ -19,7 +19,7 @@ def gzip_folder(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--folder_path", required=True, type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--output_path",  required=True, type=str, help="Path to the training dataset (optional).")
+    parser.add_argument("--output_file",  required=True, type=str, help="Path to the training dataset (optional).")
     args_ = parser.parse_args()
     gzip_folder(args_)
 
