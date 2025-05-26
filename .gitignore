@@ -1,0 +1,10 @@
+checkpoints/
+checkpoints/A
+checkpoints/B
+checkpoints/C
+checkpoints/D
+
+
+logs/
+
+source/__pycache__/

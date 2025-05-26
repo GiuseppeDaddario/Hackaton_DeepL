@@ -1,0 +1,13 @@
+THIS WASN'T SUBMITTED
+
+num_layer = 3
+emb_dim = 128
+epochs = 50
+epoch_boost = 5
+
+
+accA = 65
+accB = 54
+accC = 75
+accD = 73
+
