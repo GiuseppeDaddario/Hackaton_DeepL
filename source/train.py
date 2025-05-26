@@ -126,6 +126,6 @@ def train(
     if save_checkpoints:
         final_checkpoint_path = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
         torch.save(model.state_dict(), final_checkpoint_path)
-        # print(f"Checkpoint saved at {final_checkpoint_path}") # Rimuovi o commenta se troppo verboso
+        print(f"Checkpoint saved at {final_checkpoint_path}")
 
     return avg_batch_accuracy_epoch, avg_epoch_loss

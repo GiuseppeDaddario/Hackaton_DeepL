@@ -5,26 +5,25 @@ import os
 import torch
 import torch.optim as optim
 from torch_geometric.loader import DataLoader
-import numpy as np # NECESSARIO per y_values_numpy
-from tqdm import tqdm # NECESSARIO per calculate_global_train_accuracy
+import numpy as np
+from tqdm import tqdm
 
 ## Modular imports
 from source.evaluation import evaluate
 from source.statistics import save_predictions, plot_training_progress
-from source.train import train # Assicurati che sia la versione aggiornata
+from source.train import train
 from source.dataLoader import add_zeros
 
-from src.loadData import GraphDataset
-from src.loss import ncodLoss, gcodLoss # Assicurati che sia la versione aggiornata di gcodLoss
-from src.models import GNN
-from src.utils import set_seed
+from source.loadData import GraphDataset
+from source.loss import ncodLoss, gcodLoss
+from source.models import GNN
+from source.utils import set_seed
 
 # Set the random seed
 set_seed()
 
 # Funzione per calcolare l'accuratezza globale di training (atrain)
-# (invariata)
-def calculate_global_train_accuracy(model, full_train_loader, device, num_classes_dataset_calc):
+def calculate_global_train_accuracy(model, full_train_loader, device):
     model.eval()
     correct = 0
     total = 0
@@ -48,7 +47,6 @@ def calculate_global_train_accuracy(model, full_train_loader, device, num_classe
 ######################################################
 
 def main(args):
-    # (Parte iniziale invariata)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
@@ -147,7 +145,7 @@ def main(args):
         print("Starting training...")
         for epoch in range(num_epochs):
             if args.criterion in ["ncod", "gcod"] and full_train_loader_for_atrain is not None:
-                atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device, num_dataset_classes)
+                atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
             avg_batch_acc_epoch, epoch_loss_avg = train(
                 atrain_global_value=atrain_global,
