@@ -9,10 +9,10 @@ import numpy as np # NECESSARIO per y_values_numpy
 from tqdm import tqdm # NECESSARIO per calculate_global_train_accuracy
 
 ## Modular imports
-from modular.evaluation import evaluate
-from modular.statistics import save_predictions, plot_training_progress
-from modular.train import train # Assicurati che sia la versione aggiornata
-from modular.dataLoader import add_zeros
+from source.evaluation import evaluate
+from source.statistics import save_predictions, plot_training_progress
+from source.train import train # Assicurati che sia la versione aggiornata
+from source.dataLoader import add_zeros
 
 from src.loadData import GraphDataset
 from src.loss import ncodLoss, gcodLoss # Assicurati che sia la versione aggiornata di gcodLoss

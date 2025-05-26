@@ -15,7 +15,7 @@ def gzip_folder(folder_path, output_file):
 
 if __name__ == "__main__":
 
-    folder_path = "/Users/giuseppedaddario/Downloads/submission"            # Path to the folder you want to compress
-    output_file = "/Users/giuseppedaddario/Downloads/submission.gz"         # Output .gz file name
+    folder_path = "/Users/giuseppedaddario/Desktop/submission"            # Path to the folder you want to compress
+    output_file = "/Users/giuseppedaddario/Desktop/submission.gz"         # Output .gz file name
     gzip_folder(folder_path, output_file)
 
