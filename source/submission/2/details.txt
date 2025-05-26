@@ -7,6 +7,6 @@ epoch_boost = 0
 
 
 accA = 68, loss=2.8
-accB = 
-accC = 
+accB = 55, loss=3.1
+accC = 79, loss=2.8
 accD = 75.5, loss=2.5
