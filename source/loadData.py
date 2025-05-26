@@ -19,13 +19,8 @@ class GraphDataset(Dataset):
     def get(self, idx):
         graph_dict = self.graphs_dicts_list[idx]
         data_obj = dictToGraphObject(graph_dict)
-        return {
-            "edge_index": data_obj.edge_index,
-            "edge_attr": data_obj.edge_attr,
-            "num_nodes": data_obj.num_nodes,
-            "y": data_obj.y,
-            "original_idx": torch.tensor([idx], dtype=torch.long)
-        }
+        data_obj.original_idx = torch.tensor([idx], dtype=torch.long)
+        return data_obj
 
 def dictToGraphObject(graph_dict):
     edge_index = torch.tensor(graph_dict["edge_index"], dtype=torch.long)
