@@ -48,7 +48,7 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
     return correct / total
 
 
-def _run_on_tpu(args):
+def _run_on_tpu(rank, args):
     # Otteniamo il dispositivo TPU
     device = xm.xla_device()
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
