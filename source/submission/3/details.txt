@@ -1,0 +1,13 @@
+THIS WASN'T SUBMITTED
+
+num_layer = 5
+emb_dim = 500
+epochs = 150
+epoch_boost = 50
+l3_weight = 0.3
+
+
+accA = 69, loss=2.3
+accB = 58, loss=2.4
+accC = , loss=
+accD = , loss=
