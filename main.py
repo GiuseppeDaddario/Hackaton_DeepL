@@ -151,6 +151,8 @@ def main(args):
         atrain_global = 0.0
         print("Starting training...")
         for epoch in range(num_epochs):
+            if epoch <= args.epoch_boost:
+                print("Current in boosting: CE loss")
             if args.criterion in ["ncod", "gcod"] and full_train_loader_for_atrain is not None:
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
