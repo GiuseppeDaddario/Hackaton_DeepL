@@ -29,15 +29,6 @@ from source.utils import set_seed
 set_seed()
 
 
-def custom_collate_fn(batch):
-    collated = {}
-    for key in batch[0]:
-        values = [d[key] for d in batch if d[key] is not None]
-        if isinstance(values[0], torch.Tensor):
-            collated[key] = torch.stack(values)
-        else:
-            collated[key] = values
-    return collated
 
 
 # Funzione per calcolare l'accuratezza globale di training (atrain)
@@ -111,7 +102,7 @@ def _run_on_tpu(rank, args):
         print("Loading train dataset into DataLoader...")
         # Wrapper DataLoader per TPU
         train_loader_for_batches = pl.MpDeviceLoader(
-            DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=custom_collate_fn),
+            DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True),
             device
         )
 
