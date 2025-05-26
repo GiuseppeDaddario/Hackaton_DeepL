@@ -1,6 +1,7 @@
 # train.py (solo la parte rilevante)
 import numpy as np
 import torch
+from torch_geometric.data import Batch
 from tqdm import tqdm
 import torch_xla.core.xla_model as xm
 
@@ -23,7 +24,7 @@ def train(
         lambda_l3_weight,
         epoch_boost,
         loss_fn_ce,
-        is_tpu=False  # Parametro aggiunto per TPU
+        is_tpu=True  # Parametro aggiunto per TPU
 ):
     model.train()
     if hasattr(loss_function_obj, 'train'):
@@ -34,8 +35,11 @@ def train(
     total_samples_in_epoch = 0
 
     for batch_idx, data_batch in enumerate(tqdm(train_loader, desc=f"Epoch {current_epoch+1} Training", unit="batch", leave=False)):
-        graphs_in_batch = data_batch.to(device)
-        true_labels_int = graphs_in_batch.y.to(device)
+        num_graphs = data_batch.pop('_num_graphs', None)
+        graphs_in_batch = Batch(**data_batch)
+        if num_graphs is not None: # Restore num_graphs if needed, though Batch might recalc it
+            graphs_in_batch.num_graphs = num_graphs
+        true_labels_int = graphs_in_batch.y
         batch_original_indices = graphs_in_batch.original_idx.view(-1).tolist()
         target_one_hot = torch.zeros(
             len(true_labels_int),

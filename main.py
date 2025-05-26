@@ -28,7 +28,38 @@ from source.utils import set_seed
 # Set the random seed
 set_seed()
 
+from torch_geometric.data import Batch # Add this import if not already there
+from torch.utils.data.dataloader import default_collate # For handling non-PyG parts if any
 
+def pyg_data_list_to_dict_collate(data_list):
+    """
+    Collate a list of PyG Data objects into a dictionary of batched tensors.
+    Also includes necessary attributes for reconstructing a Batch object later.
+    """
+    if not isinstance(data_list, list) or not all(hasattr(d, 'keys') for d in data_list):
+        # Fallback for unexpected data types, or adapt as needed
+        return default_collate(data_list)
+
+    # Use Batch.from_data_list to get the batched attributes correctly
+    # This temporarily creates a Batch object on CPU.
+    temp_cpu_batch = Batch.from_data_list(data_list)
+
+    batch_dict = {}
+    for key in temp_cpu_batch.keys: # Iterate over PyG-recognized keys
+        batch_dict[key] = getattr(temp_cpu_batch, key)
+
+    # Add batch and ptr attributes explicitly if they are not covered by .keys
+    # and are needed for model input or reconstruction.
+    # MpDeviceLoader will move these tensors to the XLA device.
+    if hasattr(temp_cpu_batch, 'batch'):
+        batch_dict['batch'] = temp_cpu_batch.batch
+    if hasattr(temp_cpu_batch, 'ptr'):
+        batch_dict['ptr'] = temp_cpu_batch.ptr
+
+    # Store num_graphs for potential reconstruction, though often not directly used by models
+    batch_dict['_num_graphs'] = temp_cpu_batch.num_graphs
+
+    return batch_dict
 
 
 # Funzione per calcolare l'accuratezza globale di training (atrain)
@@ -38,8 +69,11 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
     total = 0
     with torch.no_grad():
         for data_batch in tqdm(full_train_loader, desc="Calculating global train accuracy (atrain)", unit="batch", leave=False, disable=True):
-            graphs = data_batch.to(device)
-            labels_int = graphs.y.to(device)
+            num_graphs = data_batch.pop('_num_graphs', None)
+            graphs = Batch(**data_batch)
+            if num_graphs is not None: # Restore num_graphs if needed, though Batch might recalc it
+                graphs.num_graphs = num_graphs
+            labels_int = graphs.y
             outputs_logits, _, _ = model(graphs)
             _, predicted = torch.max(outputs_logits.data, 1)
             total += labels_int.size(0)
@@ -102,7 +136,7 @@ def _run_on_tpu(rank, args):
         print("Loading train dataset into DataLoader...")
         # Wrapper DataLoader per TPU
         train_loader_for_batches = pl.MpDeviceLoader(
-            DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True),
+            DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, collate_fn=pyg_data_list_to_dict_collate),
             device
         )
 
@@ -110,7 +144,7 @@ def _run_on_tpu(rank, args):
         if args.criterion in ["ncod", "gcod"]:
             print("Preparing full train loader for atrain calculation...")
             full_train_loader_for_atrain = pl.MpDeviceLoader(
-                DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False),
+                DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=pyg_data_list_to_dict_collate),
                 device
             )
 
@@ -189,7 +223,7 @@ def _run_on_tpu(rank, args):
                 lambda_l3_weight=args.lambda_l3_weight if args.criterion == "gcod" else 0.0,
                 epoch_boost=args.epoch_boost,
                 loss_fn_ce=loss_fn_ce,
-                is_tpu=True  # Aggiungi questo flag per identificare l'uso di TPU
+                is_tpu=True
             )
 
             # Formatta il logging di atrain per evitare errore se non usato
