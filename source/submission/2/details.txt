@@ -1,0 +1,12 @@
+THIS WASN'T SUBMITTED
+
+num_layer = 2
+emb_dim = 128
+epochs = 70
+epoch_boost = 0
+
+
+accA = 68, loss=2.8
+accB = 
+accC = 
+accD = 

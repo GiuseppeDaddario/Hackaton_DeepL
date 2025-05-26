@@ -151,7 +151,7 @@ def main(args):
         atrain_global = 0.0
         print("Starting training...")
         for epoch in range(num_epochs):
-            if epoch <= args.epoch_boost:
+            if epoch < args.epoch_boost:
                 print("Current in boosting: CE loss")
             if args.criterion in ["ncod", "gcod"] and full_train_loader_for_atrain is not None:
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
@@ -210,10 +210,10 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--criterion", type=str, default="ce", choices=["ce", "ncod", "gcod"], help="Type of loss to use (ce, ncod, gcod)")
+    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "ncod", "gcod"], help="Type of loss to use (ce, ncod, gcod)")
     parser.add_argument("--lr_model", type=float, default=0.001, help="learning rate for the main GNN model (default: 0.001)") # Learning rate per il modello
-    parser.add_argument("--lr_u", type=float, default=0.001, help="lr for u parameters in NCOD/GCOD (default: 0.0001)")
-    parser.add_argument("--lambda_l3_weight", type=float, default=1, help="Weight for L3 component in GCOD loss when updating model parameters (default: 0.3)")
+    parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in NCOD/GCOD (default: 0.0001)")
+    parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss when updating model parameters (default: 0.3)")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
     parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Save or not the predictions")
     parser.add_argument("--num_checkpoints", type=int, default=5, help="Number of intermediate checkpoints to save (0 for none, 1 for end only).")
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     parser.add_argument('--emb_dim', type=int, default=300, help='dimensionality of hidden units in GNNs (default: 300)')
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
-    parser.add_argument('--epoch_boost', type=int, default=5, help='number of epochs to do with CE loss before starting with GCOD')
+    parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD')
 
     args = parser.parse_args()
     main(args)
