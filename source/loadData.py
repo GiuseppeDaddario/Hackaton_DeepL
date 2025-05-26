@@ -19,8 +19,16 @@ class GraphDataset(Dataset):
     def get(self, idx):
         graph_dict = self.graphs_dicts_list[idx]
         data_obj = dictToGraphObject(graph_dict)
-        data_obj.original_idx = torch.tensor([idx], dtype=torch.long)
-        return data_obj
+
+        # Ricrea un Data "pulito" copiando i tensori
+        data_clean = Data(
+            edge_index=data_obj.edge_index.clone(),
+            edge_attr=data_obj.edge_attr.clone() if data_obj.edge_attr is not None else None,
+            num_nodes=data_obj.num_nodes,
+            y=data_obj.y.clone() if data_obj.y is not None else None,
+            original_idx=torch.tensor([idx], dtype=torch.long)
+        )
+        return data_clean
 
 def dictToGraphObject(graph_dict):
     edge_index = torch.tensor(graph_dict["edge_index"], dtype=torch.long)
