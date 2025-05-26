@@ -19,7 +19,8 @@ def train(
         current_epoch,
         criterion_type,
         num_classes_dataset,
-        lambda_l3_weight=0.3 # Aggiunto parametro per il peso di L3 nell'aggiornamento di theta
+        lambda_l3_weight,
+        epoch_boost
 ):
     model.train()
     if hasattr(loss_function_obj, 'train'):
@@ -54,61 +55,69 @@ def train(
             optimizer_model.step()
             current_batch_loss_for_display = loss_ce.item()
 
-        elif criterion_type == "gcod": # o "ncod" se la logica è simile
-            # Chiamata al metodo che restituisce L1, L2, L3
-            l1_val, l2_val, l3_val = loss_function_obj.calculate_loss_components(
-                batch_original_indices,
-                output_logits,             # Logits da θ
-                target_one_hot,
-                graph_level_embeddings,    # Embedding da θ
-                batch_idx,
-                current_epoch,
-                atrain_global_value
-            )
-
-            # --- Aggiornamento per i parametri del modello θ (Eq. 10: ∇θ(L1 + L3)) ---
-            optimizer_model.zero_grad()
-            loss_for_model_theta = l1_val + lambda_l3_weight * l3_val # Applica il peso a L3 qui
-            if torch.isnan(loss_for_model_theta).any() or torch.isinf(loss_for_model_theta).any():
-                print(f"Epoch {current_epoch+1}, Batch {batch_idx}: NaN/Inf in loss_for_model_theta ({loss_for_model_theta.item()}). Skipping model update.")
-                # Potresti voler saltare l'aggiornamento o gestire l'errore
-            else:
-                loss_for_model_theta.backward(retain_graph=True if optimizer_loss_params is not None else False) # retain_graph se L2 usa parti del grafo
-                # che sono state usate anche da L1 o L3 e
-                # che NON sono state detached.
-                # In questo caso, output_logits è usato da L1 e L3.
-                # L2 usa output_logits.detach().
-                # u_batch è usato da L1 e L2.
-                # Se L1 ha .backward(retain_graph=True) allora i buffer intermedi
-                # per calcolare i gradienti di u rispetto a L1 sono mantenuti.
-                # Ma vogliamo solo ∇u L2, non ∇u L1.
-                # Quindi è meglio fare backward separati senza retain_graph se possibile.
-                # Per essere sicuri, e data la struttura, è meglio
-                # azzerare i gradienti di u prima di L2.backward()
+        elif criterion_type == "gcod":
+            if current_epoch <= epoch_boost:
+                optimizer_model.zero_grad()
+                loss_ce = loss_function_obj(output_logits, true_labels_int)
+                loss_ce.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optimizer_model.step()
+                current_batch_loss_for_display = loss_ce.item()
+            else:
+                # Chiamata al metodo che restituisce L1, L2, L3
+                l1_val, l2_val, l3_val = loss_function_obj.calculate_loss_components(
+                    batch_original_indices,
+                    output_logits,             # Logits da θ
+                    target_one_hot,
+                    graph_level_embeddings,    # Embedding da θ
+                    batch_idx,
+                    current_epoch,
+                    atrain_global_value
+                )
 
-            # --- Aggiornamento per i parametri u (Eq. 11: ∇u L2) ---
-            if optimizer_loss_params is not None:
-                optimizer_loss_params.zero_grad() # Azzera i gradienti di u PRIMA di L2.backward()
-                # per assicurarsi che solo L2 contribuisca ai gradienti di u.
-                if torch.isnan(l2_val).any() or torch.isinf(l2_val).any():
-                    print(f"Epoch {current_epoch+1}, Batch {batch_idx}: NaN/Inf in l2_val ({l2_val.item()}). Skipping u update.")
+                # --- Aggiornamento per i parametri del modello θ (Eq. 10: ∇θ(L1 + L3)) ---
+                optimizer_model.zero_grad()
+                loss_for_model_theta = l1_val + lambda_l3_weight * l3_val # Applica il peso a L3 qui
+                if torch.isnan(loss_for_model_theta).any() or torch.isinf(loss_for_model_theta).any():
+                    print(f"Epoch {current_epoch+1}, Batch {batch_idx}: NaN/Inf in loss_for_model_theta ({loss_for_model_theta.item()}). Skipping model update.")
+                    # Potresti voler saltare l'aggiornamento o gestire l'errore
                 else:
-                    l2_val.backward() # Calcola i gradienti di L2 rispetto a u (e altri parametri se non detached)
-                # Clip dei gradienti specifici per i parametri della loss 'u'
-                torch.nn.utils.clip_grad_norm_(loss_function_obj.parameters(), max_norm=1.0) # Adatta max_norm se necessario
-                optimizer_loss_params.step()
+                    loss_for_model_theta.backward(retain_graph=True if optimizer_loss_params is not None else False) # retain_graph se L2 usa parti del grafo
+                    # che sono state usate anche da L1 o L3 e
+                    # che NON sono state detached.
+                    # In questo caso, output_logits è usato da L1 e L3.
+                    # L2 usa output_logits.detach().
+                    # u_batch è usato da L1 e L2.
+                    # Se L1 ha .backward(retain_graph=True) allora i buffer intermedi
+                    # per calcolare i gradienti di u rispetto a L1 sono mantenuti.
+                    # Ma vogliamo solo ∇u L2, non ∇u L1.
+                    # Quindi è meglio fare backward separati senza retain_graph se possibile.
+                    # Per essere sicuri, e data la struttura, è meglio
+                    # azzerare i gradienti di u prima di L2.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer_model.step()
 
-                # Clipping esplicito di u dopo l'aggiornamento per mantenerlo in [eps, 1-eps]
-                with torch.no_grad():
-                    loss_function_obj.u.data.clamp_(min=eps, max=1.0 - eps)
+                # --- Aggiornamento per i parametri u (Eq. 11: ∇u L2) ---
+                if optimizer_loss_params is not None:
+                    optimizer_loss_params.zero_grad() # Azzera i gradienti di u PRIMA di L2.backward()
+                    # per assicurarsi che solo L2 contribuisca ai gradienti di u.
+                    if torch.isnan(l2_val).any() or torch.isinf(l2_val).any():
+                        print(f"Epoch {current_epoch+1}, Batch {batch_idx}: NaN/Inf in l2_val ({l2_val.item()}). Skipping u update.")
+                    else:
+                        l2_val.backward() # Calcola i gradienti di L2 rispetto a u (e altri parametri se non detached)
+                    # Clip dei gradienti specifici per i parametri della loss 'u'
+                    torch.nn.utils.clip_grad_norm_(loss_function_obj.parameters(), max_norm=1.0) # Adatta max_norm se necessario
+                    optimizer_loss_params.step()
 
-            # Per il logging, puoi sommare le loss o usare una metrica specifica
-            current_batch_loss_for_display = (l1_val + l2_val + lambda_l3_weight * l3_val).item()
-            if np.isnan(current_batch_loss_for_display) or np.isinf(current_batch_loss_for_display):
-                print(f"Epoch {current_epoch+1}, Batch {batch_idx}: Combined loss is NaN/Inf. Logging as 0 for safety.")
-                current_batch_loss_for_display = 0 # Evita errori nel logging
+                    # Clipping esplicito di u dopo l'aggiornamento per mantenerlo in [eps, 1-eps]
+                    with torch.no_grad():
+                        loss_function_obj.u.data.clamp_(min=eps, max=1.0 - eps)
+
+                # Per il logging, puoi sommare le loss o usare una metrica specifica
+                current_batch_loss_for_display = (l1_val + l2_val + lambda_l3_weight * l3_val).item()
+                if np.isnan(current_batch_loss_for_display) or np.isinf(current_batch_loss_for_display):
+                    print(f"Epoch {current_epoch+1}, Batch {batch_idx}: Combined loss is NaN/Inf. Logging as 0 for safety.")
+                    current_batch_loss_for_display = 0 # Evita errori nel logging
         else:
             raise ValueError(f"Tipo di criterion '{criterion_type}' non supportato.")
 

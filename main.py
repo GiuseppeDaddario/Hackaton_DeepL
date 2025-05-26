@@ -70,7 +70,14 @@ def main(args):
     logs_folder = os.path.join(script_dir, "logs", test_dir_name)
     log_file = os.path.join(logs_folder, "training.log")
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
-    logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s',
+        force=True
+    )
     logging.getLogger().addHandler(logging.StreamHandler())
 
     checkpoint_path_best = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_best.pth")
@@ -160,7 +167,8 @@ def main(args):
                 current_epoch=epoch,
                 criterion_type=args.criterion,
                 num_classes_dataset=num_dataset_classes,
-                lambda_l3_weight=args.lambda_l3_weight if args.criterion == "gcod" else 0.0 # Passa il peso solo per gcod
+                lambda_l3_weight=args.lambda_l3_weight if args.criterion == "gcod" else 0.0,
+                epoch_boost=args.epoch_boost
             )
 
             # Formatta il logging di atrain per evitare errore se non usato
@@ -214,6 +222,7 @@ if __name__ == "__main__":
     parser.add_argument('--emb_dim', type=int, default=300, help='dimensionality of hidden units in GNNs (default: 300)')
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
+    parser.add_argument('--epoch_boost', type=int, default=5, help='number of epochs to do with CE loss before starting with GCOD')
 
     args = parser.parse_args()
     main(args)
