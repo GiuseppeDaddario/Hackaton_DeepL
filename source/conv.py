@@ -240,7 +240,7 @@ class GNN_node_Virtualnode(torch.nn.Module):
                                                                  torch.nn.Linear(2*emb_dim, emb_dim), torch.nn.BatchNorm1d(emb_dim), torch.nn.ReLU()))
 
 
-    def forward(self, batched_data):
+    def forward(self, batched_data, train=False):
 
         x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
 
