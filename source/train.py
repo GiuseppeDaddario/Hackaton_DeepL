@@ -57,6 +57,7 @@ def train(
 
         elif criterion_type == "gcod":
             if current_epoch <= epoch_boost:
+                print("Current in boosting: CE loss")
                 optimizer_model.zero_grad()
                 loss_fn_ce = torch.nn.CrossEntropyLoss()
                 loss_ce = loss_fn_ce(output_logits, true_labels_int)
