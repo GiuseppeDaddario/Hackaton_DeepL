@@ -56,7 +56,7 @@ def train(
             current_batch_loss_for_display = loss_ce.item()
 
         elif criterion_type == "gcod":
-            if current_epoch <= epoch_boost:
+            if current_epoch < epoch_boost:
                 optimizer_model.zero_grad()
                 loss_fn_ce = torch.nn.CrossEntropyLoss()
                 loss_ce = loss_fn_ce(output_logits, true_labels_int)
