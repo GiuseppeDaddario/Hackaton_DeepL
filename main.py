@@ -218,7 +218,4 @@ if __name__ == "__main__":
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
 
     args = parser.parse_args()
-    # Aggiunta per il learning rate del modello all'ottimizzatore
-    # optimizer_model = torch.optim.Adam(model.parameters(), lr=args.lr_model, weight_decay=1e-4)
-    # Questo deve essere fatto dopo la costruzione del modello, quindi lo sposto dentro main(args)
     main(args)

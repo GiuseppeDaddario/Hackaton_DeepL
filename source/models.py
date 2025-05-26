@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
 
-from src.conv import GNN_node, GNN_node_Virtualnode
+from source.conv import GNN_node, GNN_node_Virtualnode
 
 
 class GNN(torch.nn.Module):
