@@ -17,7 +17,8 @@ def train_epoch(
         num_classes_dataset, # Necessario per gcodLoss e one-hot
         lambda_l3_weight, # Necessario per gcodLoss
         current_epoch,
-        atrain_global_value, # Necessario per gcodLoss
+        atrain_global_value,
+        save_checkpoints,
         epoch_boost=0, # Per la fase di boosting con CE se usi GCOD
         gradient_clipping_norm=1.0
 ):
@@ -118,5 +119,10 @@ def train_epoch(
 
     avg_epoch_loss = running_epoch_loss_display / total_samples_in_epoch if total_samples_in_epoch > 0 else 0.0
     avg_epoch_accuracy = (correct_samples_in_epoch / total_samples_in_epoch) * 100 if total_samples_in_epoch > 0 else 0.0
+
+    if save_checkpoints:
+        final_checkpoint_path = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
+        torch.save(model.state_dict(), final_checkpoint_path)
+        print(f"Checkpoint saved at {final_checkpoint_path}")
 
     return avg_epoch_loss, avg_epoch_accuracy

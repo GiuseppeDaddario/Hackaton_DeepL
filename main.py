@@ -44,16 +44,17 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
     set_seed(args.seed)
 
     # --- Setup Cartelle e Logging ---
-    test_dir_name = os.path.basename(os.path.normpath(args.test_path))
+    test_dir_name = os.path.basename(os.path.dirname(args.test_path))
     logs_folder = os.path.join(script_dir, "logs", test_dir_name)
-    checkpoints_folder = os.path.join(script_dir, "checkpoints", test_dir_name)
-    os.makedirs(logs_folder, exist_ok=True)
-    os.makedirs(checkpoints_folder, exist_ok=True)
     log_file = os.path.join(logs_folder, "training.log")
-    for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
     logging.basicConfig(
-        filename=log_file, level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S', force=True
+        filename=log_file,
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s',
+        force=True
     )
     logging.getLogger().addHandler(logging.StreamHandler())
     logging.info("Starting main script...")
@@ -62,7 +63,6 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
     num_dataset_classes = 6
     num_edge_features_resolved = args.num_edge_features
-
 
     # --- Costruzione Modello ---
     logging.info("Building the model...")
@@ -85,6 +85,11 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
     optimizer_model = torch.optim.AdamW(model.parameters(), lr=args.lr_model, weight_decay=args.weight_decay)
     checkpoint_path_best_val = os.path.join(checkpoints_folder, f"model_best_val.pth")
     checkpoint_path_latest = os.path.join(checkpoints_folder, f"model_latest.pth")
+
+    if args.num_checkpoints is not None and args.num_checkpoints > 0:
+        if args.num_checkpoints == 1: checkpoint_intervals = [num_epochs]
+        else: checkpoint_intervals = [int((i + 1) * num_epochs / args.num_checkpoints) for i in range(args.num_checkpoints)]
+    else: checkpoint_intervals = []
 
     # --- Training ---
     if args.train_path:
@@ -176,7 +181,8 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
                 criterion_obj=criterion_obj, criterion_type=args.criterion,
                 optimizer_loss_params=optimizer_loss_params, num_classes_dataset=num_dataset_classes,
                 lambda_l3_weight=args.lambda_l3_weight, current_epoch=epoch,
-                atrain_global_value=atrain_global, epoch_boost=args.epoch_boost,
+                atrain_global_value=atrain_global, save_checkpoints=(epoch + 1 in checkpoint_intervals),
+                epoch_boost=args.epoch_boost,
                 gradient_clipping_norm=args.gradient_clipping
             )
             train_losses_history.append(avg_train_loss)
@@ -269,8 +275,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
 
     # Dataset and Paths
-    parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+    parser.add_argument("--train_path", type=str, default="datasets/B/train.json.gz", help="Path to the training dataset (optional).")
+    parser.add_argument("--test_path", type=str, default="datasets/B/test.json.gz", help="Path to the test dataset.")
 
     # Model Architecture
     parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
