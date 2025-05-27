@@ -19,6 +19,7 @@ def train_epoch(
         current_epoch,
         atrain_global_value,
         save_checkpoints,
+        checkpoint_path,
         epoch_boost=0, # Per la fase di boosting con CE se usi GCOD
         gradient_clipping_norm=1.0
 ):

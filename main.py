@@ -187,7 +187,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
                 criterion_obj=criterion_obj, criterion_type=args.criterion,
                 optimizer_loss_params=optimizer_loss_params, num_classes_dataset=num_dataset_classes,
                 lambda_l3_weight=args.lambda_l3_weight, current_epoch=epoch,
-                atrain_global_value=atrain_global, save_checkpoints=(epoch + 1 in checkpoint_intervals),
+                atrain_global_value=atrain_global, save_checkpoints=(epoch + 1 in checkpoint_intervals), checkpoint_path=checkpoints_folder_epochs,
                 epoch_boost=args.epoch_boost,
                 gradient_clipping_norm=args.gradient_clipping
             )
