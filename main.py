@@ -306,14 +306,4 @@ if __name__ == "__main__":
     parser.add_argument('--num_workers', type=int, default=0, help='Number of Dataloader workers (default: 0 for main process, >0 for multiprocessing)')
 
     args = parser.parse_args()
-
-    if args.gnn_type == 'transformer':
-        if args.emb_dim % args.transformer_heads != 0:
-            logging.warning(
-                f"For TransformerConv, emb_dim ({args.emb_dim}) "
-                f"should ideally be divisible by transformer_heads ({args.transformer_heads}) "
-                f"for even distribution. Our CustomTransformerConvBlock handles this, "
-                f"but it's worth noting."
-            )
-
     main(args)
