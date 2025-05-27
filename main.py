@@ -236,16 +236,14 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             logging.error(f"Test path {args.test_path} DNE.")
             return
 
-        checkpoint_to_load_path = checkpoints_folder_epochs
-        if not os.path.exists(checkpoints_folder_epochs):
-            logging.warning(f"Best val model {checkpoints_folder_epochs} not found. Trying latest {checkpoints_folder_epochs}.")
-            checkpoint_to_load_path = checkpoints_folder_epochs
-            if not os.path.exists(checkpoints_folder_epochs):
-                logging.error("No model checkpoint found for prediction.")
-                return
+        checkpoint_to_load_path = checkpoint_path_best
+        if not os.path.exists(checkpoint_to_load_path):
+            logging.error(f"No model checkpoint found at {checkpoint_to_load_path}.")
+            return
 
         logging.info(f"Loading model from {checkpoint_to_load_path} for prediction.")
         loaded_data = torch.load(checkpoint_to_load_path, map_location=device)
+
         if isinstance(loaded_data, dict) and 'model_state_dict' in loaded_data:
             model.load_state_dict(loaded_data['model_state_dict'])
         else:
@@ -281,7 +279,7 @@ if __name__ == "__main__":
     parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
     parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN message passing layers (default: 3)')
     parser.add_argument('--emb_dim', type=int, default=128, help='Dimensionality of hidden units in GNNs (default: 128)')
-    parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio (default: 0.1)')
+    parser.add_argument('--drop_ratio', type=float, default=0.2, help='Dropout ratio (default: 0.1)')
     parser.add_argument('--transformer_heads', type=int, default=4, help='Number of attention heads for TransformerConv (default: 4)')
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (default: 7, VERIFY FROM DATASET)')
     parser.add_argument('--jk_mode', type=str, default="last", choices=["last", "sum", "mean", "concat"], help="Jumping Knowledge mode (default: last)")
