@@ -31,26 +31,32 @@ from torch_geometric.data import Batch, Data
 from torch.utils.data.dataloader import default_collate
 import torch
 
+def _debug_print_collate(message):
+    # Temporaneamente, stampa sempre per il debug
+    print(f"[COLLATE DEBUG] {message}")
+
 def pyg_data_list_to_dict_collate(data_list):
+    _debug_print_collate(f"Inizio collate. Lunghezza data_list: {len(data_list)}")
     if not data_list:
+        _debug_print_collate("data_list vuota, ritorno {}")
         return {}
 
     valid_items = [item for item in data_list if isinstance(item, (Data, Batch))]
     if not valid_items:
-        return default_collate(data_list) # Fallback se nessun item valido
+        _debug_print_collate(f"Nessun item valido Data/Batch. Ritorno default_collate. Originale: {data_list}")
+        return default_collate(data_list)
+    _debug_print_collate(f"Numero di valid_items: {len(valid_items)}")
 
     try:
         temp_pyg_batch_on_cpu = Batch.from_data_list(valid_items)
+        _debug_print_collate("Batch.from_data_list eseguito con successo.")
+        # _debug_print_collate(f"temp_pyg_batch_on_cpu.keys: {list(temp_pyg_batch_on_cpu.keys)}")
+        # _debug_print_collate(f"temp_pyg_batch_on_cpu.num_graphs: {temp_pyg_batch_on_cpu.num_graphs}")
     except Exception as e:
-
-        print(f"ERRORE CRITICO in Batch.from_data_list durante la collazione: {e}")
-        print(f"Lunghezza valid_items: {len(valid_items)}")
-        if valid_items:
-            print(f"Primo item in valid_items (tipo {type(valid_items[0])}):")
-            if hasattr(valid_items[0], 'to_dict'):
-                print(valid_items[0].to_dict())
-            else:
-                print(valid_items[0])
+        _debug_print_collate(f"ERRORE CRITICO in Batch.from_data_list: {e}")
+        # Stampa dettagli sugli items che hanno causato l'errore
+        for i, item_err in enumerate(valid_items):
+            _debug_print_collate(f"  Item {i} (tipo {type(item_err)}): {item_err.to_dict() if hasattr(item_err, 'to_dict') else item_err}")
         raise e
 
     final_plain_dict = {}
@@ -58,23 +64,29 @@ def pyg_data_list_to_dict_collate(data_list):
         if hasattr(temp_pyg_batch_on_cpu, key):
             value = getattr(temp_pyg_batch_on_cpu, key)
             if torch.is_tensor(value):
-                # Clona il tensore per evitare problemi di riferimento e assicurare che sia "pulito".
                 final_plain_dict[key] = value.clone()
+            # else:
+            # _debug_print_collate(f"Attributo '{key}' da keys non è un tensore (tipo: {type(value)}). Non incluso.")
 
     if 'batch' not in final_plain_dict and hasattr(temp_pyg_batch_on_cpu, 'batch') and torch.is_tensor(temp_pyg_batch_on_cpu.batch):
         final_plain_dict['batch'] = temp_pyg_batch_on_cpu.batch.clone()
-
     if 'ptr' not in final_plain_dict and hasattr(temp_pyg_batch_on_cpu, 'ptr') and torch.is_tensor(temp_pyg_batch_on_cpu.ptr):
         final_plain_dict['ptr'] = temp_pyg_batch_on_cpu.ptr.clone()
 
-    # Aggiungi _num_graphs (un intero, non un tensore che XLA sposterà, ma utile per la ricostruzione).
     if hasattr(temp_pyg_batch_on_cpu, 'num_graphs'):
         final_plain_dict['_num_graphs'] = temp_pyg_batch_on_cpu.num_graphs
     else:
-        final_plain_dict['_num_graphs'] = len(valid_items) # Fallback
+        final_plain_dict['_num_graphs'] = len(valid_items)
+
+    _debug_print_collate("Contenuto di final_plain_dict prima del return:")
+    for k_final, v_final in final_plain_dict.items():
+        if torch.is_tensor(v_final):
+            _debug_print_collate(f"  '{k_final}': Tensor, shape={v_final.shape}, dtype={v_final.dtype}, device={v_final.device}")
+        else:
+            _debug_print_collate(f"  '{k_final}': {type(v_final)}, value={v_final}")
+    _debug_print_collate("-" * 30)
 
     return final_plain_dict
-
 def calculate_global_train_accuracy(model, full_train_loader, device):
     model.eval()
     correct = 0
