@@ -228,28 +228,65 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
             print(f"Error: Best model checkpoint not found at {checkpoint_path_best}. Cannot perform prediction.")
             return
 
-        print("Preparing test dataset...")
-        test_dataset = GraphDataset(args.test_path, transform=add_zeros if "add_zeros" in globals() else None)
-        print("Loading test dataset...")
-        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+        test_path_A = args.test_path_A
+        test_path_B = args.test_path_B
+        test_path_C = args.test_path_C
+        test_path_D = args.test_path_D
+        model.load_state_dict(torch.load(checkpoint_path_best))
+        print(f"Loaded best model from {checkpoint_path_best}")
+        for i in range(1,4):
+            # Cleaning RAM and GPU
+            try:
+                del train_dataset
+            except NameError:
+                pass
 
-        print("Generating predictions for the test set...")
-        model.load_state_dict(torch.load(checkpoint_path_best)) # Carica dal path del modello migliore
-        predictions = evaluate(test_loader, model, device, calculate_accuracy=False) # Assumi che evaluate non necessiti di lambda_l3_weight
-        save_predictions(predictions, args.test_path)
-        print("Predictions saved successfully.")
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+            if i == 1:
+                print("Preparing test dataset A...")
+                test_dataset = GraphDataset(test_path_A, transform=add_zeros if "add_zeros" in globals() else None)
+            elif i == 2:
+                print("Preparing test dataset B...")
+                test_dataset = GraphDataset(test_path_B, transform=add_zeros if "add_zeros" in globals() else None)
+            elif i == 3:
+                print("Preparing test dataset C...")
+                test_dataset = GraphDataset(test_path_C, transform=add_zeros if "add_zeros" in globals() else None)
+            else:
+                print("Preparing test dataset D...")
+                test_dataset = GraphDataset(test_path_D, transform=add_zeros if "add_zeros" in globals() else None)
+
+            test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
+            print("Generating predictions for the test set...")
+            predictions = evaluate(test_loader, model, device, calculate_accuracy=False) # Assumi che evaluate non necessiti di lambda_l3_weight
+            save_predictions(predictions, args.test_path)
+            print("Predictions saved successfully.")
 
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
-    parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
+    parser.add_argument("--train_all", type=int,default=1, help="Path to the training dataset (optional).")
+    parser.add_argument("--train_path_A", type=str, default="datasets/A/train.json.gz", help="Path to the training dataset (optional).")
+    parser.add_argument("--train_path_B", type=str, default="datasets/B/train.json.gz", help="Path to the training dataset (optional).")
+    parser.add_argument("--train_path_C", type=str, default="datasets/C/train.json.gz", help="Path to the training dataset (optional).")
+    parser.add_argument("--train_path_D", type=str, default="datasets/D/train.json.gz", help="Path to the training dataset (optional).")
+
     parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "ncod", "gcod"], help="Type of loss to use (ce, ncod, gcod)")
     parser.add_argument("--lr_model", type=float, default=0.001, help="learning rate for the main GNN model (default: 0.001)") # Learning rate per il modello
     parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in NCOD/GCOD (default: 0.0001)")
     parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss when updating model parameters (default: 0.3)")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+
+    #parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+    parser.add_argument("--test_path_A", type=str, default="datasets/A/test.json.gz", help="Path to the test dataset.")
+    parser.add_argument("--test_path_B", type=str, default="datasets/B/test.json.gz", help="Path to the test dataset.")
+    parser.add_argument("--test_path_C", type=str, default="datasets/C/test.json.gz", help="Path to the test dataset.")
+    parser.add_argument("--test_path_D", type=str, default="datasets/D/test.json.gz", help="Path to the test dataset.")
+
     parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Save or not the predictions")
     parser.add_argument("--num_checkpoints", type=int, default=5, help="Number of intermediate checkpoints to save (0 for none, 1 for end only).")
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
