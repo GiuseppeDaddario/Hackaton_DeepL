@@ -4,6 +4,7 @@ import logging
 import os
 import torch
 import torch.optim as optim
+from torch_geometric.graphgym.loader import load_dataset
 from torch_geometric.loader import DataLoader
 import numpy as np
 from tqdm import tqdm
@@ -91,16 +92,7 @@ def main(args):
     if args.train_path:
         print("Preparing train dataset...")
 
-        if args.load_dataset and os.path.exists(args.load_dataset):
-            print(f"Loading dataset from {args.load_dataset}...")
-            train_dataset = torch.load(args.load_dataset, weights_only=False)
-        else:
-            print("Loading dataset from raw path...")
-            train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
-            if args.save_dataset:
-                print(f"Saving processed dataset to {args.save_dataset}...")
-                torch.save(train_dataset, args.save_dataset)
-
+        train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
 
         print("Loading train dataset into DataLoader...")
         train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
@@ -216,6 +208,8 @@ def main(args):
         predictions = evaluate(test_loader, model, device, calculate_accuracy=False) # Assumi che evaluate non necessiti di lambda_l3_weight
         save_predictions(predictions, args.test_path)
         print("Predictions saved successfully.")
+
+    return train_dataset,train_loader_for_batches,model
 
 
 if __name__ == "__main__":
