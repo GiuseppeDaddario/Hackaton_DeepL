@@ -1,10 +1,10 @@
 ## Imports
 import argparse
+import gc
 import logging
 import os
 import torch
 import torch.optim as optim
-from torch_geometric.graphgym.loader import load_dataset
 from torch_geometric.loader import DataLoader
 import numpy as np
 from tqdm import tqdm
@@ -87,119 +87,140 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
     checkpoints_folder_epochs = os.path.join(script_dir, "checkpoints", test_dir_name)
     os.makedirs(checkpoints_folder_epochs, exist_ok=True)
 
-    if os.path.exists(checkpoint_path_best) and not args.train_path:
-        model.load_state_dict(torch.load(checkpoint_path_best))
-        print(f"Loaded best model from {checkpoint_path_best}")
+    #if os.path.exists(checkpoint_path_best) and not args.train_path:
+     #   model.load_state_dict(torch.load(checkpoint_path_best))
+      #  print(f"Loaded best model from {checkpoint_path_best}")
+    names = ["A", "B", "C", "D"]
+    if args.train_all == 1:
+        path_A = args.train_path_A
+        path_B = args.train_path_B
+        path_C = args.train_path_C
+        path_D = args.train_path_D
+        for i in range(1,4):
+            # Cleaning RAM and GPU
+            try:
+                del train_dataset
+            except NameError:
+                pass
 
-    if args.train_path:
-        print("Preparing train dataset...")
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
-        if train_dataset is None:
-            train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
+            print(f"Loading train dataset {names[i]}...")
+            if i == 1:
+                train_dataset = GraphDataset(path_A, transform=add_zeros if "add_zeros" in globals() else None)
+            elif i == 2:
+                train_dataset = GraphDataset(path_B, transform=add_zeros if "add_zeros" in globals() else None)
+            elif i == 3:
+                train_dataset = GraphDataset(path_C, transform=add_zeros if "add_zeros" in globals() else None)
+            else:
+                train_dataset = GraphDataset(path_D, transform=add_zeros if "add_zeros" in globals() else None)
 
-        print("Loading train dataset into DataLoader...")
-        if train_loader_for_batches is None:
-            train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        full_train_loader_for_atrain = None
-        if args.criterion in ["ncod", "gcod"]:
-            print("Preparing full train loader for atrain calculation...")
-            full_train_loader_for_atrain = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
+            print(f"Loading train dataset {i} into DataLoader...")
+            if train_loader_for_batches is None:
+                train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
-        print(f"Initializing loss function: {args.criterion}")
-        if not hasattr(train_dataset, 'graphs_dicts_list'):
-            raise AttributeError("L'oggetto train_dataset deve avere l'attributo 'graphs_dicts_list'.")
+            full_train_loader_for_atrain = None
+            if args.criterion in ["ncod", "gcod"]:
+                print("Preparing full train loader for atrain calculation...")
+                full_train_loader_for_atrain = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
 
-        y_values_numpy = np.array([graph["y"][0] for graph in train_dataset.graphs_dicts_list if graph.get("y") and len(graph["y"]) > 0])
-        loss_function_obj = None
-        optimizer_loss_params = None
+            print(f"Initializing loss function: {args.criterion}")
+            if not hasattr(train_dataset, 'graphs_dicts_list'):
+                raise AttributeError("L'oggetto train_dataset deve avere l'attributo 'graphs_dicts_list'.")
 
-        if args.criterion == "ncod":
-            # ... (codice per ncodLoss invariato)
-            loss_function_obj = ncodLoss(
-                sample_labels=y_values_numpy,
-                device=device,
-                num_examp=len(train_dataset),
-                num_classes=num_dataset_classes,
-                ratio_consistency=0, # Esempio, usa i tuoi args
-                ratio_balance=0,   # Esempio, usa i tuoi args
-                encoder_features=args.emb_dim,
-                total_epochs=args.epochs
-            )
-            optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
-        elif args.criterion == "gcod":
-            loss_function_obj = gcodLoss(
-                sample_labels_numpy=y_values_numpy,
-                device=device,
-                num_examp=len(train_dataset),
-                num_classes=num_dataset_classes,
-                gnn_embedding_dim=args.emb_dim,
-                total_epochs=args.epochs
-            )
-            optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
-        elif args.criterion == "ce":
-            loss_function_obj = torch.nn.CrossEntropyLoss()
+            y_values_numpy = np.array([graph["y"][0] for graph in train_dataset.graphs_dicts_list if graph.get("y") and len(graph["y"]) > 0])
+            loss_function_obj = None
             optimizer_loss_params = None
-        else:
-            raise ValueError(f"Unsupported criterion: {args.criterion}")
 
-        if hasattr(loss_function_obj, 'to'):
-            loss_function_obj.to(device)
+            if args.criterion == "ncod":
+                # ... (codice per ncodLoss invariato)
+                loss_function_obj = ncodLoss(
+                    sample_labels=y_values_numpy,
+                    device=device,
+                    num_examp=len(train_dataset),
+                    num_classes=num_dataset_classes,
+                    ratio_consistency=0, # Esempio, usa i tuoi args
+                    ratio_balance=0,   # Esempio, usa i tuoi args
+                    encoder_features=args.emb_dim,
+                    total_epochs=args.epochs
+                )
+                optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
+            elif args.criterion == "gcod":
+                loss_function_obj = gcodLoss(
+                    sample_labels_numpy=y_values_numpy,
+                    device=device,
+                    num_examp=len(train_dataset),
+                    num_classes=num_dataset_classes,
+                    gnn_embedding_dim=args.emb_dim,
+                    total_epochs=args.epochs
+                )
+                optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
+            elif args.criterion == "ce":
+                loss_function_obj = torch.nn.CrossEntropyLoss()
+                optimizer_loss_params = None
+            else:
+                raise ValueError(f"Unsupported criterion: {args.criterion}")
 
-        num_epochs = args.epochs
-        best_train_accuracy = 0.0
-        train_losses_history = []
-        train_accuracies_history = []
+            if hasattr(loss_function_obj, 'to'):
+                loss_function_obj.to(device)
 
-        if args.num_checkpoints is not None and args.num_checkpoints > 0:
-            if args.num_checkpoints == 1: checkpoint_intervals = [num_epochs]
-            else: checkpoint_intervals = [int((i + 1) * num_epochs / args.num_checkpoints) for i in range(args.num_checkpoints)]
-        else: checkpoint_intervals = []
+            num_epochs = args.epochs
+            best_train_accuracy = 0.0
+            train_losses_history = []
+            train_accuracies_history = []
 
-        atrain_global = 0.0
-        print("Starting training...")
-        for epoch in range(num_epochs):
-            if epoch < args.epoch_boost:
-                print("Current in boosting: CE loss")
-            if args.criterion in ["ncod", "gcod"] and full_train_loader_for_atrain is not None:
-                atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
+            if args.num_checkpoints is not None and args.num_checkpoints > 0:
+                if args.num_checkpoints == 1: checkpoint_intervals = [num_epochs]
+                else: checkpoint_intervals = [int((i + 1) * num_epochs / args.num_checkpoints) for i in range(args.num_checkpoints)]
+            else: checkpoint_intervals = []
 
-            avg_batch_acc_epoch, epoch_loss_avg = train(
-                atrain_global_value=atrain_global,
-                train_loader=train_loader_for_batches,
-                model=model,
-                optimizer_model=optimizer_model,
-                device=device,
-                optimizer_loss_params=optimizer_loss_params,
-                loss_function_obj=loss_function_obj,
-                save_checkpoints=(epoch + 1 in checkpoint_intervals),
-                checkpoint_path=os.path.join(checkpoints_folder_epochs, f"model_{test_dir_name}"),
-                current_epoch=epoch,
-                criterion_type=args.criterion,
-                num_classes_dataset=num_dataset_classes,
-                lambda_l3_weight=args.lambda_l3_weight if args.criterion == "gcod" else 0.0,
-                epoch_boost=args.epoch_boost
-            )
+            atrain_global = 0.0
+            print("Starting training...")
+            for epoch in range(num_epochs):
+                if epoch < args.epoch_boost:
+                    print("Current in boosting: CE loss")
+                if args.criterion in ["ncod", "gcod"] and full_train_loader_for_atrain is not None:
+                    atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
-            # Formatta il logging di atrain per evitare errore se non usato
-            atrain_log_str = f"{atrain_global:.4f}" if args.criterion in ['ncod', 'gcod'] else 'N/A'
-            print(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}")
-            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain: {atrain_log_str}")
+                avg_batch_acc_epoch, epoch_loss_avg = train(
+                    atrain_global_value=atrain_global,
+                    train_loader=train_loader_for_batches,
+                    model=model,
+                    optimizer_model=optimizer_model,
+                    device=device,
+                    optimizer_loss_params=optimizer_loss_params,
+                    loss_function_obj=loss_function_obj,
+                    save_checkpoints=(epoch + 1 in checkpoint_intervals),
+                    checkpoint_path=os.path.join(checkpoints_folder_epochs, f"model_{test_dir_name}"),
+                    current_epoch=epoch,
+                    criterion_type=args.criterion,
+                    num_classes_dataset=num_dataset_classes,
+                    lambda_l3_weight=args.lambda_l3_weight if args.criterion == "gcod" else 0.0,
+                    epoch_boost=args.epoch_boost
+                )
+
+                # Formatta il logging di atrain per evitare errore se non usato
+                atrain_log_str = f"{atrain_global:.4f}" if args.criterion in ['ncod', 'gcod'] else 'N/A'
+                print(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}")
+                logging.info(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain: {atrain_log_str}")
 
 
-            train_losses_history.append(epoch_loss_avg)
-            train_accuracies_history.append(avg_batch_acc_epoch)
+                train_losses_history.append(epoch_loss_avg)
+                train_accuracies_history.append(avg_batch_acc_epoch)
 
-            if avg_batch_acc_epoch > best_train_accuracy:
-                best_train_accuracy = avg_batch_acc_epoch
-                torch.save(model.state_dict(), checkpoint_path_best)
-                print(f"Best model (based on avg batch train acc) updated and saved at {checkpoint_path_best}")
+                if avg_batch_acc_epoch > best_train_accuracy:
+                    best_train_accuracy = avg_batch_acc_epoch
+                    torch.save(model.state_dict(), checkpoint_path_best)
+                    print(f"Best model (based on avg batch train acc) updated and saved at {checkpoint_path_best}")
 
-        plot_training_progress(train_losses_history, train_accuracies_history, os.path.join(logs_folder, "plots"))
+            plot_training_progress(train_losses_history, train_accuracies_history, os.path.join(logs_folder, "plots"))
 
-        if args.ret == "all":
-            return train_dataset, model, train_loader_for_batches
-        elif args.ret == "model":
-            return model
+            if args.ret == "all":
+                return train_dataset, model, train_loader_for_batches
+            elif args.ret == "model":
+                return model
 
     # (Sezione predict invariata)
     if args.predict == 1:
