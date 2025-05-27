@@ -22,9 +22,9 @@ class GraphDataset(Dataset):
         data_obj.original_index = torch.tensor([idx], dtype=torch.long)
 
         # DEBUG PRINT (puoi rimuoverlo dopo aver confermato che funziona)
-        # print(f"DEBUG GraphDataset.get(idx={idx}): hasattr(data_obj, 'original_index') = {hasattr(data_obj, 'original_index')}")
-        # if hasattr(data_obj, 'original_index'):
-        #     print(f"DEBUG GraphDataset.get(idx={idx}): data_obj.original_index = {data_obj.original_index}")
+        print(f"DEBUG GraphDataset.get(idx={idx}): hasattr(data_obj, 'original_index') = {hasattr(data_obj, 'original_index')}")
+        if hasattr(data_obj, 'original_index'):
+            print(f"DEBUG GraphDataset.get(idx={idx}): data_obj.original_index = {data_obj.original_index}")
 
         return data_obj
 
