@@ -23,6 +23,32 @@ def save_predictions(predictions, test_path):
     print(f"Predictions saved to {output_csv_path}")
 
 
+
+
+
+def save_predictions_1(predictions, output_path):
+    """
+    Salva le predizioni in un file CSV.
+    
+    Args:
+        predictions (List[int] or List[float]): Lista delle predizioni (etichette o probabilità).
+        output_path (str): Percorso del file CSV di output.
+    """
+    # Creazione della directory se non esiste
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Creazione del DataFrame
+    df = pd.DataFrame({"id": list(range(len(predictions))), "pred": predictions})
+
+    # Salvataggio CSV
+    df.to_csv(output_path, index=False)
+    print(f"Predictions saved to {output_path}")
+
+
+
+
+
+
 def plot_training_progress(train_losses, train_accuracies, output_dir):
     epochs = range(1, len(train_losses) + 1)
     plt.figure(figsize=(12, 6))

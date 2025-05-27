@@ -1,0 +1,14 @@
+Training session:
+Epochs: 20
+Parameters:
+ - Criterion: gcod
+ - LR model: 0.001
+ - LR u: 0.01
+ - Lambda L3 Weight: 0.7
+ - GNN type: gin
+ - Dropout ratio: 0.5
+ - Num layers: 5
+ - Embedding dim: 300
+ - Batch size: 32
+ - Epoch boost: 0
+----------------------------------------
