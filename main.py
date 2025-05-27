@@ -4,6 +4,7 @@ import logging
 import os
 import torch
 import torch.optim as optim
+from torch_geometric.graphgym.loader import load_dataset
 from torch_geometric.loader import DataLoader
 import numpy as np
 from tqdm import tqdm
@@ -46,23 +47,25 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
 ##                                                  ##
 ######################################################
 
-def main(args):
+def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
+    print(f"Using device: {device}")
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
     num_dataset_classes = 6
 
     print("Building the model...")
-    if args.gnn == 'gin':
-        model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-    elif args.gnn == 'gin-virtual':
-        model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-    elif args.gnn == 'gcn':
-        model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-    elif args.gnn == 'gcn-virtual':
-        model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-    else:
-        raise ValueError('Invalid GNN type')
+    if model is None:
+        if args.gnn == 'gin':
+            model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+        elif args.gnn == 'gin-virtual':
+            model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+        elif args.gnn == 'gcn':
+            model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+        elif args.gnn == 'gcn-virtual':
+            model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+        else:
+            raise ValueError('Invalid GNN type')
 
     optimizer_model = torch.optim.Adam(model.parameters(), lr=args.lr_model, weight_decay=1e-4) # Usa args.lr_model
 
@@ -90,9 +93,13 @@ def main(args):
 
     if args.train_path:
         print("Preparing train dataset...")
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
+
+        if train_dataset is None:
+            train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
+
         print("Loading train dataset into DataLoader...")
-        train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        if train_loader_for_batches is None:
+            train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         full_train_loader_for_atrain = None
         if args.criterion in ["ncod", "gcod"]:
             print("Preparing full train loader for atrain calculation...")
@@ -189,6 +196,11 @@ def main(args):
 
         plot_training_progress(train_losses_history, train_accuracies_history, os.path.join(logs_folder, "plots"))
 
+        if args.ret == "all":
+            return train_dataset, model, train_loader_for_batches
+        elif args.ret == "model":
+            return model
+
     # (Sezione predict invariata)
     if args.predict == 1:
         if not os.path.exists(checkpoint_path_best):
@@ -205,6 +217,8 @@ def main(args):
         predictions = evaluate(test_loader, model, device, calculate_accuracy=False) # Assumi che evaluate non necessiti di lambda_l3_weight
         save_predictions(predictions, args.test_path)
         print("Predictions saved successfully.")
+
+
 
 
 if __name__ == "__main__":
@@ -225,6 +239,8 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
     parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD')
+    parser.add_argument('--ret', type=str, default=None, help='for kaggle')
 
     args = parser.parse_args()
     main(args)
+
