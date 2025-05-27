@@ -230,8 +230,6 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
     parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD')
-    parser.add_argument("--save_dataset", type=str, help="Save processed dataset to this file path.")
-    parser.add_argument("--load_dataset", type=str, help="Load preprocessed dataset from this file path.")
 
     args = parser.parse_args()
     main(args)
