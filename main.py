@@ -37,7 +37,7 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
     if total == 0: return 0.0
     return correct / total
 
-def main(args):
+def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     device = torch.device(f"cuda:{args.device}" if torch.cuda.is_available() and args.device >= 0 else "cpu")
 
@@ -89,8 +89,8 @@ def main(args):
     # --- Training ---
     if args.train_path:
         logging.info("Preparing train and validation datasets...")
-        full_train_dataset = GraphDataset(args.train_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
-
+        if full_train_dataset is None:
+            full_train_dataset = GraphDataset(args.train_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
 
         try:
             labels_for_split = [data.y.item() for data in full_train_dataset if data.y is not None]
@@ -113,8 +113,10 @@ def main(args):
         logging.info(f"Training subset size: {len(train_dataset_subset)}")
         logging.info(f"Validation subset size: {len(val_dataset_subset)}")
 
-        train_loader = DataLoader(train_dataset_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=device.type == 'cuda')
-        val_loader = DataLoader(val_dataset_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=device.type == 'cuda')
+        if train_loader is None:
+            train_loader = DataLoader(train_dataset_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=device.type == 'cuda')
+        if val_loader is None:
+            val_loader = DataLoader(val_dataset_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=device.type == 'cuda')
 
         full_train_loader_for_atrain = None
         if args.criterion == "gcod":
@@ -260,6 +262,7 @@ def main(args):
         logging.info(f"Predictions saved to {output_prediction_path}")
 
     logging.info("Main script finished.")
+    return full_train_dataset, train_loader, val_loader
 
 
 if __name__ == "__main__":
@@ -302,4 +305,4 @@ if __name__ == "__main__":
     parser.add_argument('--num_workers', type=int, default=0, help='Number of Dataloader workers (default: 0 for main process, >0 for multiprocessing)')
 
     args = parser.parse_args()
-    main(args)
+    main(args, full_train_dataset=None, train_loader=None, val_loader=None)
