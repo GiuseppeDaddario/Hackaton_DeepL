@@ -50,6 +50,7 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
 def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
+    print(f"Using device: {device}")
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
     num_dataset_classes = 6
 
