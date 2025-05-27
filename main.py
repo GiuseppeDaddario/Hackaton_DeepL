@@ -216,7 +216,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
             if avg_val_acc > best_val_accuracy:
                 best_val_accuracy = avg_val_acc
-                torch.save(model.state_dict(), checkpoints_folder_epochs)
+                torch.save(model.state_dict(), checkpoint_path_best)
                 logging.info(f"Best validation model updated: {checkpoints_folder_epochs} (Val Acc: {best_val_accuracy*100:.2f}%)")
                 epochs_no_improve = 0
             else:
