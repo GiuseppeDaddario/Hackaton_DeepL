@@ -90,7 +90,18 @@ def main(args):
 
     if args.train_path:
         print("Preparing train dataset...")
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
+
+        if args.load_dataset and os.path.exists(args.load_dataset):
+            print(f"Loading dataset from {args.load_dataset}...")
+            train_dataset = torch.load(args.load_dataset)
+        else:
+            print("Loading dataset from raw path...")
+            train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
+            if args.save_dataset:
+                print(f"Saving processed dataset to {args.save_dataset}...")
+                torch.save(train_dataset, args.save_dataset)
+
+
         print("Loading train dataset into DataLoader...")
         train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         full_train_loader_for_atrain = None
@@ -225,6 +236,9 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
     parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD')
+    parser.add_argument("--save_dataset", type=str, help="Save processed dataset to this file path.")
+    parser.add_argument("--load_dataset", type=str, help="Load preprocessed dataset from this file path.")
 
     args = parser.parse_args()
     main(args)
+
