@@ -4,7 +4,8 @@ import pandas as pd
 
 
 def save_predictions(predictions, test_path):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    source_dir = os.path.dirname(os.path.abspath(__file__))
+    script_dir = os.path.dirname(source_dir)
     submission_folder = os.path.join(script_dir, "submission")
     test_dir_name = os.path.basename(os.path.dirname(test_path))
     
