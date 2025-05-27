@@ -68,19 +68,20 @@ def dictToGraphObject(graph_dict, idx_in_file):
 
 
     data_obj = Data(
-        x=node_features_x, # Aggiunto x qui, se presente nel JSON
+        x=node_features_x,
         edge_index=edge_index,
         edge_attr=edge_attr,
         num_nodes=num_nodes,
-        y=y_tensor
+        y=y_tensor,
+        original_idx=torch.tensor([idx_in_file], dtype=torch.long)
     )
-    data_obj.original_idx = torch.tensor([idx_in_file], dtype=torch.long)
     return data_obj
 
 class GraphDataset(Dataset):
-    def __init__(self, filename, transform=None, pre_transform=None, pre_filter=None):
+    def __init__(self, filename, transform=None, pre_transform=None, pre_filter=None, args_emb_dim=300):
         self.raw_filename = filename
         self.graphs_dicts_list = []
+        self.emb_dim = args_emb_dim
 
         try:
             with gzip.open(self.raw_filename, "rt", encoding="utf-8") as f:
@@ -118,13 +119,28 @@ class GraphDataset(Dataset):
 
         graph_dict = self.graphs_dicts_list[idx]
         data_obj = dictToGraphObject(graph_dict, idx)
-
-        # Applica la trasformazione DOPO la creazione dell'oggetto base
-        # Questo è importante perché add_zeros potrebbe dipendere da data_obj.num_nodes
         if self.transform:
-            data_obj = self.transform(data_obj)
-            if not hasattr(data_obj, 'x') or data_obj.x is None:
-                if data_obj.num_nodes > 0 : # Stampa warning solo se ci sono nodi
-                    print(f"Attenzione Dataset (get, idx {idx}): data.x è None dopo la trasformazione, ma num_nodes > 0. GNN potrebbe fallire.")
+            data_obj = self.transform(data_obj) # Qui add_zeros dovrebbe creare data.x
+
+        if not hasattr(data_obj, 'x') or data_obj.x is None:
+            if data_obj.num_nodes > 0:
+                print(f"ERRORE CRITICO nel Dataset (get, idx {idx}): data.x è None dopo la trasformazione e ci sono nodi!")
+                raise ValueError(f"data.x is None for graph {idx} with {data_obj.num_nodes} nodes after transform.")
+            elif data_obj.num_nodes == 0 and (not hasattr(data_obj, 'x') or data_obj.x is None):
+                data_obj.x = torch.empty((0, self.emb_dim), dtype=torch.float)
+
+
+        # Assicurati che edge_index esista sempre
+        if not hasattr(data_obj, 'edge_index') or data_obj.edge_index is None:
+            # print(f"ERRORE CRITICO nel Dataset (get, idx {idx}): data.edge_index è None!")
+            data_obj.edge_index = torch.empty((2,0), dtype=torch.long) # Placeholder per grafo vuoto
+            # Se edge_index è None, anche edge_attr dovrebbe esserlo o essere vuoto
+            if hasattr(data_obj, 'edge_attr') and data_obj.edge_attr is not None:
+                data_obj.edge_attr = torch.empty((0, data_obj.edge_attr.size(1) if data_obj.edge_attr.dim() > 1 and data_obj.edge_attr.size(0) > 0 else 0), dtype=torch.float)
+
+
+        # Assicurati che y esista (anche se None, che PyG gestisce)
+        if not hasattr(data_obj, 'y'):
+            data_obj.y = None # O un tensore placeholder se la tua logica lo richiede
 
         return data_obj
