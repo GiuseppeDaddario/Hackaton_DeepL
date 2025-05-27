@@ -276,6 +276,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_path", type=str, default="datasets/B/train.json.gz", help="Path to the training dataset (optional).")
     parser.add_argument("--test_path", type=str, default="datasets/B/test.json.gz", help="Path to the test dataset.")
 
+    parser.add_argument("--num_checkpoints", type=int, default=5, help="Number of checkpoints to save during training (default: 5). Set to 0 to disable.")
     # Model Architecture
     parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
     parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN message passing layers (default: 3)')
