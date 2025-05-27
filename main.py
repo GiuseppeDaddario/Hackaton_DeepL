@@ -4,7 +4,7 @@ import logging
 import os
 import torch
 import torch.optim as optim
-from torch_geometric.graphgym.loader import load_dataset
+# from torch_geometric.graphgym.loader import load_dataset # Non usato, rimosso per pulizia
 from torch_geometric.loader import DataLoader
 import numpy as np
 from tqdm import tqdm
@@ -12,7 +12,7 @@ from tqdm import tqdm
 ## Modular imports
 from source.evaluation import evaluate
 from source.statistics import save_predictions, plot_training_progress
-from source.train import train
+from source.train import train # Questa sarà la funzione modificata
 from source.dataLoader import add_zeros
 
 from source.loadData import GraphDataset
@@ -29,13 +29,19 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
     correct = 0
     total = 0
     with torch.no_grad():
-        for data_batch in tqdm(full_train_loader, desc="Calculating global train accuracy (atrain)", unit="batch", leave=False, disable=True):
+        # Rimosso disable=True da tqdm per vedere la progress bar se necessario
+        for data_batch in tqdm(full_train_loader, desc="Calculating global train accuracy (atrain)", unit="batch", leave=False):
             graphs = data_batch.to(device)
-            labels_int = graphs.y.to(device)
-            outputs_logits, _, _ = model(graphs)
+            # Assicurati che true_labels sia 1D per CrossEntropy e per il confronto
+            labels_int = graphs.y.to(device).squeeze()
+            if labels_int.ndim == 0: # Se è uno scalare per un batch di 1
+                labels_int = labels_int.unsqueeze(0)
+
+            # Assicurati che il modello ritorni gli embedding come secondo output se gcod è usato
+            outputs_logits, _, _ = model(graphs) # "_" sono gli embeddings se restituiti
             _, predicted = torch.max(outputs_logits.data, 1)
             total += labels_int.size(0)
-            correct += (predicted == labels_int.squeeze()).sum().item()
+            correct += (predicted == labels_int).sum().item()
     model.train()
     if total == 0: return 0.0
     return correct / total
@@ -52,10 +58,14 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
     print(f"Using device: {device}")
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
-    num_dataset_classes = 6
+
+    # num_dataset_classes è importante, assicurati sia corretto per il tuo dataset
+    # Se il dataset può variare, dovresti derivarlo da train_dataset.num_classes se disponibile
+    num_dataset_classes = 6 # Mantengo il tuo valore, ma considera di renderlo dinamico
 
     print("Building the model...")
     if model is None:
+        # La logica di creazione del modello sembra corretta
         if args.gnn == 'gin':
             model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
         elif args.gnn == 'gin-virtual':
@@ -67,7 +77,8 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         else:
             raise ValueError('Invalid GNN type')
 
-    optimizer_model = torch.optim.Adam(model.parameters(), lr=args.lr_model, weight_decay=1e-4) # Usa args.lr_model
+    # Ottimizzatore per i parametri del modello (theta)
+    optimizer_model = torch.optim.Adam(model.parameters(), lr=args.lr_model, weight_decay=1e-4)
 
     test_dir_name = os.path.basename(os.path.dirname(args.test_path))
     logs_folder = os.path.join(script_dir, "logs", test_dir_name)
@@ -95,36 +106,55 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         print("Preparing train dataset...")
 
         if train_dataset is None:
+            # IMPORTANTE per GCOD: Assicurati che GraphDataset aggiunga un campo 'original_index'
+            # a ciascun campione (Data object) in modo che sia accessibile in data_batch.original_index
+            # Esempio in GraphDataset.__getitem__(self, idx): data.original_index = torch.tensor([idx])
             train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
 
         print("Loading train dataset into DataLoader...")
         if train_loader_for_batches is None:
             train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+
         full_train_loader_for_atrain = None
-        if args.criterion in ["ncod", "gcod"]:
+        if args.criterion in ["ncod", "gcod"]: # Solo se necessario per atrain
             print("Preparing full train loader for atrain calculation...")
+            # Nota: batch_size qui può essere più grande se la memoria lo permette, dato che non c'è backward
             full_train_loader_for_atrain = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
+
 
         print(f"Initializing loss function: {args.criterion}")
         if not hasattr(train_dataset, 'graphs_dicts_list'):
-            raise AttributeError("L'oggetto train_dataset deve avere l'attributo 'graphs_dicts_list'.")
+            # Questo controllo potrebbe non essere più necessario se y_values_numpy
+            # viene estratto direttamente dal dataset PyG caricato
+            print("WARN: train_dataset non ha 'graphs_dicts_list'. Tentativo di estrarre y_values.")
+            # Tentativo di estrarre y da un dataset PyG standard
+            try:
+                y_values_list = [data.y.item() for data in train_dataset]
+                y_values_numpy = np.array(y_values_list)
+                if len(y_values_numpy) != len(train_dataset):
+                    raise ValueError("Lunghezza di y_values_numpy non corrisponde a len(train_dataset)")
+            except Exception as e:
+                raise AttributeError(f"Impossibile estrarre y_values da train_dataset. Assicurati che sia accessibile. Errore: {e}")
 
-        y_values_numpy = np.array([graph["y"][0] for graph in train_dataset.graphs_dicts_list if graph.get("y") and len(graph["y"]) > 0])
+        else: # Codice originale per estrarre y_values_numpy
+            y_values_numpy = np.array([graph["y"][0] for graph in train_dataset.graphs_dicts_list if graph.get("y") and len(graph["y"]) > 0])
+
+
         loss_function_obj = None
-        optimizer_loss_params = None
+        optimizer_loss_params = None # Questo sarà l'ottimizzatore per i parametri della loss (es. 'u' per GCOD)
 
         if args.criterion == "ncod":
-            # ... (codice per ncodLoss invariato)
             loss_function_obj = ncodLoss(
-                sample_labels=y_values_numpy,
+                sample_labels=y_values_numpy, # Rinominato per coerenza con gcodLoss
                 device=device,
                 num_examp=len(train_dataset),
                 num_classes=num_dataset_classes,
-                ratio_consistency=0, # Esempio, usa i tuoi args
-                ratio_balance=0,   # Esempio, usa i tuoi args
-                encoder_features=args.emb_dim,
+                ratio_consistency=0, # Esempio
+                ratio_balance=0,   # Esempio
+                encoder_features=args.emb_dim, # Assicurati che sia la dim corretta
                 total_epochs=args.epochs
             )
+            # Per NCOD, optimizer_loss_params potrebbe aggiornare più parametri della loss
             optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
         elif args.criterion == "gcod":
             loss_function_obj = gcodLoss(
@@ -132,17 +162,18 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
                 device=device,
                 num_examp=len(train_dataset),
                 num_classes=num_dataset_classes,
-                gnn_embedding_dim=args.emb_dim,
+                gnn_embedding_dim=args.emb_dim, # Assicurati che gli embedding del modello abbiano questa dim
                 total_epochs=args.epochs
             )
-            optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
+            # Per GCOD, loss_function_obj.parameters() dovrebbe restituire solo [loss_function_obj.u]
+            optimizer_loss_params = optim.SGD([loss_function_obj.u], lr=args.lr_u) # Esplicito per 'u'
         elif args.criterion == "ce":
             loss_function_obj = torch.nn.CrossEntropyLoss()
-            optimizer_loss_params = None
+            optimizer_loss_params = None # Nessun parametro della loss da ottimizzare per CE
         else:
             raise ValueError(f"Unsupported criterion: {args.criterion}")
 
-        if hasattr(loss_function_obj, 'to'):
+        if hasattr(loss_function_obj, 'to') and not args.criterion == "ce": # CE non è un nn.Module
             loss_function_obj.to(device)
 
         num_epochs = args.epochs
@@ -155,34 +186,37 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
             else: checkpoint_intervals = [int((i + 1) * num_epochs / args.num_checkpoints) for i in range(args.num_checkpoints)]
         else: checkpoint_intervals = []
 
-        atrain_global = 0.0
+        atrain_global = 0.0 # Inizializza atrain_global
         print("Starting training...")
         for epoch in range(num_epochs):
-            if epoch < args.epoch_boost:
-                print("Current in boosting: CE loss")
+            if epoch < args.epoch_boost: # Questo messaggio potrebbe essere spostato dentro `train` per logica più pulita
+                print(f"Epoch {epoch + 1}/{num_epochs}: In boosting phase (CE loss will be used)")
+
+            # Calcola atrain_global all'inizio di ogni epoca se necessario
             if args.criterion in ["ncod", "gcod"] and full_train_loader_for_atrain is not None:
+                # Potresti voler calcolare atrain meno frequentemente per risparmiare tempo
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
             avg_batch_acc_epoch, epoch_loss_avg = train(
                 atrain_global_value=atrain_global,
                 train_loader=train_loader_for_batches,
                 model=model,
-                optimizer_model=optimizer_model,
+                optimizer_model=optimizer_model, # Ottimizzatore per theta
                 device=device,
-                optimizer_loss_params=optimizer_loss_params,
+                optimizer_u_or_loss_params=optimizer_loss_params, # Ottimizzatore per u (GCOD) o altri parametri loss (NCOD)
                 loss_function_obj=loss_function_obj,
                 save_checkpoints=(epoch + 1 in checkpoint_intervals),
                 checkpoint_path=os.path.join(checkpoints_folder_epochs, f"model_{test_dir_name}"),
                 current_epoch=epoch,
                 criterion_type=args.criterion,
                 num_classes_dataset=num_dataset_classes,
-                lambda_l3_weight=args.lambda_l3_weight if args.criterion == "gcod" else 0.0,
-                epoch_boost=args.epoch_boost
+                lambda_l3_weight=args.lambda_l3_weight, # Passa il peso per L3
+                epoch_boost=args.epoch_boost,
+                gcod_eps=1e-7 # Passa epsilon per il clamping di u, se necessario centralmente
             )
 
-            # Formatta il logging di atrain per evitare errore se non usato
             atrain_log_str = f"{atrain_global:.4f}" if args.criterion in ['ncod', 'gcod'] else 'N/A'
-            print(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}")
+            print(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain: {atrain_log_str}")
             logging.info(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain: {atrain_log_str}")
 
 
@@ -201,7 +235,6 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         elif args.ret == "model":
             return model
 
-    # (Sezione predict invariata)
     if args.predict == 1:
         if not os.path.exists(checkpoint_path_best):
             print(f"Error: Best model checkpoint not found at {checkpoint_path_best}. Cannot perform prediction.")
@@ -213,21 +246,19 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
         print("Generating predictions for the test set...")
-        model.load_state_dict(torch.load(checkpoint_path_best)) # Carica dal path del modello migliore
-        predictions = evaluate(test_loader, model, device, calculate_accuracy=False) # Assumi che evaluate non necessiti di lambda_l3_weight
+        model.load_state_dict(torch.load(checkpoint_path_best))
+        predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
         save_predictions(predictions, args.test_path)
         print("Predictions saved successfully.")
-
-
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
     parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "ncod", "gcod"], help="Type of loss to use (ce, ncod, gcod)")
-    parser.add_argument("--lr_model", type=float, default=0.001, help="learning rate for the main GNN model (default: 0.001)") # Learning rate per il modello
-    parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in NCOD/GCOD (default: 0.0001)")
-    parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss when updating model parameters (default: 0.3)")
+    parser.add_argument("--lr_model", type=float, default=0.001, help="learning rate for the main GNN model (default: 0.001)")
+    parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in NCOD/GCOD (default: 0.01, era 0.0001)") # Ho notato che il default era 0.0001, l'ho messo a 0.01 come da descrizione
+    parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss when updating model parameters (default: 0.7, era 0.3)") # Coerente con la descrizione
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
     parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Save or not the predictions")
     parser.add_argument("--num_checkpoints", type=int, default=5, help="Number of intermediate checkpoints to save (0 for none, 1 for end only).")
@@ -238,9 +269,8 @@ if __name__ == "__main__":
     parser.add_argument('--emb_dim', type=int, default=300, help='dimensionality of hidden units in GNNs (default: 300)')
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
-    parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD')
+    parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD/NCOD')
     parser.add_argument('--ret', type=str, default=None, help='for kaggle')
 
     args = parser.parse_args()
     main(args)
-
