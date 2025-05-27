@@ -83,12 +83,18 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
     logging.info(f"Total trainable parameters: {total_params:,}")
 
     optimizer_model = torch.optim.AdamW(model.parameters(), lr=args.lr_model, weight_decay=args.weight_decay)
-    checkpoint_path_best_val = os.path.join(checkpoints_folder, f"model_best_val.pth")
-    checkpoint_path_latest = os.path.join(checkpoints_folder, f"model_latest.pth")
+
+    checkpoint_path_best = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_best.pth")
+    checkpoints_folder_epochs = os.path.join(script_dir, "checkpoints", test_dir_name)
+    os.makedirs(checkpoints_folder_epochs, exist_ok=True)
+
+    if os.path.exists(checkpoint_path_best) and not args.train_path:
+        model.load_state_dict(torch.load(checkpoint_path_best))
+        print(f"Loaded best model from {checkpoint_path_best}")
 
     if args.num_checkpoints is not None and args.num_checkpoints > 0:
-        if args.num_checkpoints == 1: checkpoint_intervals = [num_epochs]
-        else: checkpoint_intervals = [int((i + 1) * num_epochs / args.num_checkpoints) for i in range(args.num_checkpoints)]
+        if args.num_checkpoints == 1: checkpoint_intervals = [args.epochs]
+        else: checkpoint_intervals = [int((i + 1) * args.epochs / args.num_checkpoints) for i in range(args.num_checkpoints)]
     else: checkpoint_intervals = []
 
     # --- Training ---
@@ -206,20 +212,12 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
                 f"Atrain: {atrain_log_str}"
             )
 
-            torch.save({
-                'epoch': epoch, 'model_state_dict': model.state_dict(),
-                'optimizer_model_state_dict': optimizer_model.state_dict(),
-                'best_val_accuracy': best_val_accuracy,
-                'train_losses_history': train_losses_history, 'val_losses_history': val_losses_history,
-                'train_accuracies_history': train_accuracies_history, 'val_accuracies_history': val_accuracies_history,
-                'criterion_state_dict': criterion_obj.state_dict() if hasattr(criterion_obj, 'state_dict') else None,
-                'optimizer_loss_params_state_dict': optimizer_loss_params.state_dict() if optimizer_loss_params else None,
-            }, checkpoint_path_latest)
+
 
             if avg_val_acc > best_val_accuracy:
                 best_val_accuracy = avg_val_acc
-                torch.save(model.state_dict(), checkpoint_path_best_val)
-                logging.info(f"Best validation model updated: {checkpoint_path_best_val} (Val Acc: {best_val_accuracy*100:.2f}%)")
+                torch.save(model.state_dict(), checkpoints_folder_epochs)
+                logging.info(f"Best validation model updated: {checkpoints_folder_epochs} (Val Acc: {best_val_accuracy*100:.2f}%)")
                 epochs_no_improve = 0
             else:
                 epochs_no_improve += 1
@@ -238,11 +236,11 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             logging.error(f"Test path {args.test_path} DNE.")
             return
 
-        checkpoint_to_load_path = checkpoint_path_best_val
-        if not os.path.exists(checkpoint_path_best_val):
-            logging.warning(f"Best val model {checkpoint_path_best_val} not found. Trying latest {checkpoint_path_latest}.")
-            checkpoint_to_load_path = checkpoint_path_latest
-            if not os.path.exists(checkpoint_path_latest):
+        checkpoint_to_load_path = checkpoints_folder_epochs
+        if not os.path.exists(checkpoints_folder_epochs):
+            logging.warning(f"Best val model {checkpoints_folder_epochs} not found. Trying latest {checkpoints_folder_epochs}.")
+            checkpoint_to_load_path = checkpoints_folder_epochs
+            if not os.path.exists(checkpoints_folder_epochs):
                 logging.error("No model checkpoint found for prediction.")
                 return
 
