@@ -32,44 +32,63 @@ set_seed()
 from torch_geometric.data import Batch
 from torch.utils.data.dataloader import default_collate
 
+from torch_geometric.data import Batch, Data # Assicurati che Data sia importato se non lo è già
+from torch.utils.data.dataloader import default_collate
+
 def pyg_data_list_to_dict_collate(data_list):
     """
     Collate a list of PyG Data objects into a dictionary of batched tensors.
     Also includes necessary attributes for reconstructing a Batch object later.
     """
-    # MODIFICA: Gestione lista vuota e controllo tipo più robusto
     if not data_list:
-        return {} # Restituisce un dizionario vuoto se la lista è vuota
-    if not isinstance(data_list, list) or not all(isinstance(d, Batch) or hasattr(d, 'keys') for d in data_list):
-        # Se non sono oggetti Data/Batch o non hanno 'keys', usa il default_collate.
-        # Questo potrebbe accadere se il dataset è vuoto e il DataLoader produce una lista vuota.
+        return {}
+
+    valid_items = [item for item in data_list if isinstance(item, (Data, Batch)) and hasattr(item, 'keys')]
+    if not valid_items:
+        if data_list:
+            print(f"Warning: pyg_data_list_to_dict_collate riceve dati non validi: {data_list}")
+            pass # Potrebbe essere meglio sollevare un errore o restituire default_collate(data_list)
+        return default_collate(data_list) # Prova con default_collate come fallback
+
+    # Usa Batch.from_data_list per ottenere il batch corretto
+    try:
+        temp_cpu_batch = Batch.from_data_list(valid_items)
+    except Exception as e:
+        print(f"Errore in Batch.from_data_list: {e}. Dati: {valid_items}") # Debug
         return default_collate(data_list)
 
-    temp_cpu_batch = Batch.from_data_list(data_list)
-    batch_dict = {}
-    # MODIFICA: Itera su tutti gli attributi tensoriali del batch temporaneo
-    for key in temp_cpu_batch.to_dict().keys(): # to_dict() elenca tutti gli attributi memorizzati
-        attr = getattr(temp_cpu_batch, key)
-        if torch.is_tensor(attr): # Solo i tensori vanno nel dizionario per MpDeviceLoader
-            batch_dict[key] = attr
+    batch_as_dict_from_pyg = temp_cpu_batch.to_dict()
+    final_batch_dict = {}
 
-    # Assicurati che 'batch' e 'ptr' siano inclusi se esistono e sono tensori
-    if hasattr(temp_cpu_batch, 'batch') and torch.is_tensor(temp_cpu_batch.batch):
-        batch_dict['batch'] = temp_cpu_batch.batch
-    if hasattr(temp_cpu_batch, 'ptr') and torch.is_tensor(temp_cpu_batch.ptr):
-        batch_dict['ptr'] = temp_cpu_batch.ptr
+    for key, value in batch_as_dict_from_pyg.items():
+        if torch.is_tensor(value):
+            final_batch_dict[key] = value
+        else:
+            print(f"Attributo '{key}' non è un tensore nel batch, tipo: {type(value)}") # Debug
 
-    batch_dict['_num_graphs'] = temp_cpu_batch.num_graphs
 
-    # MODIFICA: Includi esplicitamente original_idx se è un attributo chiave
-    # Batch.from_data_list dovrebbe già gestirlo se 'original_idx' è un tensore in ogni Data object.
-    # Questa è una doppia verifica.
-    if 'original_idx' in batch_dict and not torch.is_tensor(batch_dict['original_idx']):
-        # Se per qualche motivo non è un tensore, rimuovilo o gestiscilo
-        del batch_dict['original_idx'] # Esempio: rimuovi se non è un tensore
+    if 'batch' not in final_batch_dict and hasattr(temp_cpu_batch, 'batch') and torch.is_tensor(temp_cpu_batch.batch):
+        final_batch_dict['batch'] = temp_cpu_batch.batch
 
-    return batch_dict
+    if 'ptr' not in final_batch_dict and hasattr(temp_cpu_batch, 'ptr') and torch.is_tensor(temp_cpu_batch.ptr):
+        final_batch_dict['ptr'] = temp_cpu_batch.ptr
 
+    final_batch_dict['_num_graphs'] = temp_cpu_batch.num_graphs
+
+    # Assicurati che 'original_idx' sia incluso se è un tensore e presente
+    if 'original_idx' not in final_batch_dict and hasattr(temp_cpu_batch, 'original_idx') and torch.is_tensor(temp_cpu_batch.original_idx):
+        final_batch_dict['original_idx'] = temp_cpu_batch.original_idx
+
+
+    # Debug: stampa le chiavi e i tipi nel dizionario finale
+    if xm.is_master_ordinal():
+        print("Batch dict keys and types for MpDeviceLoader:")
+        for k, v in final_batch_dict.items():
+            print(f"  {k}: {type(v)}")
+            if torch.is_tensor(v):
+                print(f"     shape: {v.shape}, dtype: {v.dtype}")
+
+    return final_batch_dict
 
 def calculate_global_train_accuracy(model, full_train_loader, device):
     model.eval()
