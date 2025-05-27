@@ -1,29 +1,27 @@
-## Imports
 import argparse
 import logging
 import os
 import torch
 import torch.optim as optim
-from torch_geometric.graphgym.loader import load_dataset
 from torch_geometric.loader import DataLoader
+from sklearn.model_selection import train_test_split
 import numpy as np
 from tqdm import tqdm
+import time
 
-## Modular imports
-from source.evaluation import evaluate
+# Modular imports
+from source.evaluation import evaluate_model
 from source.statistics import save_predictions, plot_training_progress
-from source.train import train
-from source.dataLoader import add_zeros
-
-from source.loadData import GraphDataset
-from source.loss import gcodLoss
+from source.train import train_epoch
+from source.dataLoader import add_zeros # Utilizzato da GraphDataset
+from source.loadData import GraphDataset # La tua classe GraphDataset
+from source.loss import gcodLoss, LabelSmoothingCrossEntropy
 from source.models import GNN
 from source.utils import set_seed
 
-# Set the random seed
 set_seed()
 
-# Funzione per calcolare l'accuratezza globale di training (atrain)
+
 def calculate_global_train_accuracy(model, full_train_loader, device):
     model.eval()
     correct = 0
@@ -36,198 +34,286 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
             _, predicted = torch.max(outputs_logits.data, 1)
             total += labels_int.size(0)
             correct += (predicted == labels_int.squeeze()).sum().item()
-    model.train()
     if total == 0: return 0.0
     return correct / total
 
-
-######################################################
-##                                                  ##
-##                   MAIN FUNCTION                  ##
-##                                                  ##
-######################################################
-
-def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
+def main(args):
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
-    print(f"Using device: {device}")
-    num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
-    num_dataset_classes = 6
+    device = torch.device(f"cuda:{args.device}" if torch.cuda.is_available() and args.device >= 0 else "cpu")
 
-    print("Building the model...")
-    if model is None:
-        if args.gnn == 'gin':
-            model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-        elif args.gnn == 'gin-virtual':
-            model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-        elif args.gnn == 'gcn':
-            model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-        elif args.gnn == 'gcn-virtual':
-            model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-        else:
-            raise ValueError('Invalid GNN type')
+    set_seed(args.seed)
 
-    optimizer_model = torch.optim.Adam(model.parameters(), lr=args.lr_model, weight_decay=1e-4) # Usa args.lr_model
-
-    test_dir_name = os.path.basename(os.path.dirname(args.test_path))
+    # --- Setup Cartelle e Logging ---
+    test_dir_name = os.path.basename(os.path.normpath(args.test_path))
     logs_folder = os.path.join(script_dir, "logs", test_dir_name)
+    checkpoints_folder = os.path.join(script_dir, "checkpoints", test_dir_name)
+    os.makedirs(logs_folder, exist_ok=True)
+    os.makedirs(checkpoints_folder, exist_ok=True)
     log_file = os.path.join(logs_folder, "training.log")
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
+    for handler in logging.root.handlers[:]: logging.root.removeHandler(handler)
     logging.basicConfig(
-        filename=log_file,
-        level=logging.INFO,
-        format='%(asctime)s - %(message)s',
-        force=True
+        filename=log_file, level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S', force=True
     )
     logging.getLogger().addHandler(logging.StreamHandler())
+    logging.info("Starting main script...")
+    logging.info(f"Arguments: {args}")
+    logging.info(f"Using device: {device}")
 
-    checkpoint_path_best = os.path.join(script_dir, "checkpoints", f"model_{test_dir_name}_best.pth")
-    checkpoints_folder_epochs = os.path.join(script_dir, "checkpoints", test_dir_name)
-    os.makedirs(checkpoints_folder_epochs, exist_ok=True)
+    num_dataset_classes = 6
+    num_edge_features_resolved = args.num_edge_features
 
-    if os.path.exists(checkpoint_path_best) and not args.train_path:
-        model.load_state_dict(torch.load(checkpoint_path_best))
-        print(f"Loaded best model from {checkpoint_path_best}")
 
+    # --- Costruzione Modello ---
+    logging.info("Building the model...")
+    model = GNN(
+        gnn_type=args.gnn_type,
+        num_class=num_dataset_classes,
+        num_layer=args.num_layer,
+        emb_dim=args.emb_dim,
+        drop_ratio=args.drop_ratio,
+        JK=args.jk_mode,
+        graph_pooling=args.graph_pooling,
+        num_edge_features=num_edge_features_resolved,
+        transformer_heads=args.transformer_heads,
+        residual=not args.no_residual
+    ).to(device)
+    logging.info(f"Model architecture: {model}")
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logging.info(f"Total trainable parameters: {total_params:,}")
+
+    optimizer_model = torch.optim.AdamW(model.parameters(), lr=args.lr_model, weight_decay=args.weight_decay)
+    checkpoint_path_best_val = os.path.join(checkpoints_folder, f"model_best_val.pth")
+    checkpoint_path_latest = os.path.join(checkpoints_folder, f"model_latest.pth")
+
+    # --- Training ---
     if args.train_path:
-        print("Preparing train dataset...")
+        logging.info("Preparing train and validation datasets...")
+        full_train_dataset = GraphDataset(args.train_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
 
-        if train_dataset is None:
-            train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
 
-        print("Loading train dataset into DataLoader...")
-        if train_loader_for_batches is None:
-            train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        try:
+            labels_for_split = [data.y.item() for data in full_train_dataset if data.y is not None]
+        except Exception as e:
+            logging.error(f"Could not extract labels for stratified split: {e}. Ensure dataset elements have a .y attribute.")
+            raise
+
+        train_indices, val_indices = train_test_split(
+            range(len(full_train_dataset)),
+            test_size=args.val_split_ratio,
+            shuffle=True,
+            stratify=labels_for_split,
+            random_state=args.seed
+        )
+
+        train_dataset_subset = torch.utils.data.Subset(full_train_dataset, train_indices)
+        val_dataset_subset = torch.utils.data.Subset(full_train_dataset, val_indices)
+
+        logging.info(f"Full train set size: {len(full_train_dataset)}")
+        logging.info(f"Training subset size: {len(train_dataset_subset)}")
+        logging.info(f"Validation subset size: {len(val_dataset_subset)}")
+
+        train_loader = DataLoader(train_dataset_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=device.type == 'cuda')
+        val_loader = DataLoader(val_dataset_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=device.type == 'cuda')
+
         full_train_loader_for_atrain = None
         if args.criterion == "gcod":
-            print("Preparing full train loader for atrain calculation...")
-            full_train_loader_for_atrain = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
+            logging.info("Preparing current training subset loader for atrain calculation (used by GCOD)...")
+            full_train_loader_for_atrain = DataLoader(train_dataset_subset, batch_size=args.batch_size, shuffle=False)
 
-        print(f"Initializing loss function: {args.criterion}")
-        if not hasattr(train_dataset, 'graphs_dicts_list'):
-            raise AttributeError("L'oggetto train_dataset deve avere l'attributo 'graphs_dicts_list'.")
-
-        y_values_numpy = np.array([graph["y"][0] for graph in train_dataset.graphs_dicts_list if graph.get("y") and len(graph["y"]) > 0])
-        loss_function_obj = None
+        # --- Inizializzazione Loss Function ---
+        logging.info(f"Initializing loss function: {args.criterion}")
+        criterion_obj = None
         optimizer_loss_params = None
 
-        if args.criterion == "gcod":
-            loss_function_obj = gcodLoss(
-                sample_labels_numpy=y_values_numpy,
+        if args.criterion == "ce":
+            criterion_obj = LabelSmoothingCrossEntropy(classes=num_dataset_classes, smoothing=args.label_smoothing).to(device)
+        elif args.criterion == "gcod":
+
+            if not hasattr(full_train_dataset, 'graphs_dicts_list'):
+                logging.warning("full_train_dataset does not have 'graphs_dicts_list'. GCOD might not initialize correctly if 'original_idx' handling is not robust.")
+                y_values_numpy_for_gcod = np.array([d.y.item() for d in full_train_dataset if d.y is not None])
+            else:
+                y_values_numpy_for_gcod = np.array([
+                    graph_dict["y"][0] for graph_dict in full_train_dataset.graphs_dicts_list
+                    if graph_dict.get("y") and len(graph_dict["y"]) > 0
+                ])
+
+            if len(y_values_numpy_for_gcod) != len(full_train_dataset):
+                logging.warning(f"Mismatch in length for GCOD y_values ({len(y_values_numpy_for_gcod)}) and full_train_dataset ({len(full_train_dataset)}). This can be problematic.")
+
+            criterion_obj = gcodLoss(
+                sample_labels_numpy=y_values_numpy_for_gcod,
                 device=device,
-                num_examp=len(train_dataset),
+                num_examp=len(full_train_dataset), # Numero totale di esempi originali
                 num_classes=num_dataset_classes,
                 gnn_embedding_dim=args.emb_dim,
                 total_epochs=args.epochs
-            )
-            optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
-        elif args.criterion == "ce":
-            loss_function_obj = torch.nn.CrossEntropyLoss()
-            optimizer_loss_params = None
+            ).to(device)
+            optimizer_loss_params = optim.SGD(criterion_obj.parameters(), lr=args.lr_u)
         else:
             raise ValueError(f"Unsupported criterion: {args.criterion}")
 
-        if hasattr(loss_function_obj, 'to'):
-            loss_function_obj.to(device)
-
-        num_epochs = args.epochs
-        best_train_accuracy = 0.0
-        train_losses_history = []
-        train_accuracies_history = []
-
-        if args.num_checkpoints is not None and args.num_checkpoints > 0:
-            if args.num_checkpoints == 1: checkpoint_intervals = [num_epochs]
-            else: checkpoint_intervals = [int((i + 1) * num_epochs / args.num_checkpoints) for i in range(args.num_checkpoints)]
-        else: checkpoint_intervals = []
-
+        # --- Training Loop ---
+        best_val_accuracy = 0.0
+        epochs_no_improve = 0
+        train_losses_history, train_accuracies_history = [], []
+        val_losses_history, val_accuracies_history = [], []
         atrain_global = 0.0
-        print("Starting training...")
-        for epoch in range(num_epochs):
-            if epoch < args.epoch_boost:
-                print("Current in boosting: CE loss")
+        logging.info("Starting training loop...")
+        start_time_train = time.time()
+
+        for epoch in range(args.epochs):
+            epoch_start_time = time.time()
+
             if args.criterion == "gcod" and full_train_loader_for_atrain is not None:
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
-            avg_batch_acc_epoch, epoch_loss_avg = train(
-                atrain_global_value=atrain_global,
-                train_loader=train_loader_for_batches,
-                model=model,
-                optimizer_model=optimizer_model,
-                device=device,
-                optimizer_loss_params=optimizer_loss_params,
-                loss_function_obj=loss_function_obj,
-                save_checkpoints=(epoch + 1 in checkpoint_intervals),
-                checkpoint_path=os.path.join(checkpoints_folder_epochs, f"model_{test_dir_name}"),
-                current_epoch=epoch,
-                criterion_type=args.criterion,
-                num_classes_dataset=num_dataset_classes,
-                lambda_l3_weight=args.lambda_l3_weight if args.criterion == "gcod" else 0.0,
-                epoch_boost=args.epoch_boost
+            avg_train_loss, avg_train_acc = train_epoch(
+                model=model, loader=train_loader, optimizer_model=optimizer_model, device=device,
+                criterion_obj=criterion_obj, criterion_type=args.criterion,
+                optimizer_loss_params=optimizer_loss_params, num_classes_dataset=num_dataset_classes,
+                lambda_l3_weight=args.lambda_l3_weight, current_epoch=epoch,
+                atrain_global_value=atrain_global, epoch_boost=args.epoch_boost,
+                gradient_clipping_norm=args.gradient_clipping
+            )
+            train_losses_history.append(avg_train_loss)
+            train_accuracies_history.append(avg_train_acc)
+
+            avg_val_loss, avg_val_acc = evaluate_model(
+                model=model, loader=val_loader, device=device, criterion_obj=criterion_obj,
+                criterion_type=args.criterion if not (args.criterion == "gcod" and epoch < args.epoch_boost) else "ce",
+                num_classes_dataset=num_dataset_classes, lambda_l3_weight=args.lambda_l3_weight,
+                current_epoch_for_gcod=epoch, atrain_for_gcod=atrain_global, is_validation=True
+            )
+            val_losses_history.append(avg_val_loss)
+            val_accuracies_history.append(avg_val_acc * 100)
+
+            epoch_duration = time.time() - epoch_start_time
+            atrain_log_str = f"{atrain_global:.4f}" if args.criterion == 'gcod' and full_train_loader_for_atrain is not None else 'N/A'
+            logging.info(
+                f"Epoch {epoch + 1}/{args.epochs} | Time: {epoch_duration:.2f}s | "
+                f"Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_acc:.2f}% | "
+                f"Val Loss: {avg_val_loss:.4f}, Val Acc: {avg_val_acc*100:.2f}% | "
+                f"Atrain: {atrain_log_str}"
             )
 
-            # Formatta il logging di atrain per evitare errore se non usato
-            atrain_log_str = f"{atrain_global:.4f}" if args.criterion =='gcod'  else 'N/A'
-            print(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}")
-            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain: {atrain_log_str}")
+            torch.save({
+                'epoch': epoch, 'model_state_dict': model.state_dict(),
+                'optimizer_model_state_dict': optimizer_model.state_dict(),
+                'best_val_accuracy': best_val_accuracy,
+                'train_losses_history': train_losses_history, 'val_losses_history': val_losses_history,
+                'train_accuracies_history': train_accuracies_history, 'val_accuracies_history': val_accuracies_history,
+                'criterion_state_dict': criterion_obj.state_dict() if hasattr(criterion_obj, 'state_dict') else None,
+                'optimizer_loss_params_state_dict': optimizer_loss_params.state_dict() if optimizer_loss_params else None,
+            }, checkpoint_path_latest)
 
+            if avg_val_acc > best_val_accuracy:
+                best_val_accuracy = avg_val_acc
+                torch.save(model.state_dict(), checkpoint_path_best_val)
+                logging.info(f"Best validation model updated: {checkpoint_path_best_val} (Val Acc: {best_val_accuracy*100:.2f}%)")
+                epochs_no_improve = 0
+            else:
+                epochs_no_improve += 1
+                logging.info(f"No improvement for {epochs_no_improve} epoch(s). Best Val Acc: {best_val_accuracy*100:.2f}%")
 
-            train_losses_history.append(epoch_loss_avg)
-            train_accuracies_history.append(avg_batch_acc_epoch)
+            if args.early_stopping_patience > 0 and epochs_no_improve >= args.early_stopping_patience:
+                logging.info(f"Early stopping at epoch {epoch+1}.")
+                break
 
-            if avg_batch_acc_epoch > best_train_accuracy:
-                best_train_accuracy = avg_batch_acc_epoch
-                torch.save(model.state_dict(), checkpoint_path_best)
-                print(f"Best model (based on avg batch train acc) updated and saved at {checkpoint_path_best}")
+        total_training_time = time.time() - start_time_train
+        logging.info(f"Training finished. Total time: {total_training_time:.2f}s.")
+        plot_training_progress({"train_loss": train_losses_history, "val_loss": val_losses_history},
+                               {"train_acc": train_accuracies_history, "val_acc": val_accuracies_history},
+                               os.path.join(logs_folder, "training_plots"))
 
-        plot_training_progress(train_losses_history, train_accuracies_history, os.path.join(logs_folder, "plots"))
-
-        if args.ret == "all":
-            return train_dataset, model, train_loader_for_batches
-        elif args.ret == "model":
-            return model
-
-    # (Sezione predict invariata)
+    # --- Predizione sul Test Set ---
     if args.predict == 1:
-        if not os.path.exists(checkpoint_path_best):
-            print(f"Error: Best model checkpoint not found at {checkpoint_path_best}. Cannot perform prediction.")
+        if not os.path.exists(args.test_path):
+            logging.error(f"Test path {args.test_path} DNE.")
             return
 
-        print("Preparing test dataset...")
-        test_dataset = GraphDataset(args.test_path, transform=add_zeros if "add_zeros" in globals() else None)
-        print("Loading test dataset...")
-        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+        checkpoint_to_load_path = checkpoint_path_best_val
+        if not os.path.exists(checkpoint_path_best_val):
+            logging.warning(f"Best val model {checkpoint_path_best_val} not found. Trying latest {checkpoint_path_latest}.")
+            checkpoint_to_load_path = checkpoint_path_latest
+            if not os.path.exists(checkpoint_path_latest):
+                logging.error("No model checkpoint found for prediction.")
+                return
 
-        print("Generating predictions for the test set...")
-        model.load_state_dict(torch.load(checkpoint_path_best)) # Carica dal path del modello migliore
-        predictions = evaluate(test_loader, model, device, calculate_accuracy=False) # Assumi che evaluate non necessiti di lambda_l3_weight
-        save_predictions(predictions, args.test_path)
-        print("Predictions saved successfully.")
+        logging.info(f"Loading model from {checkpoint_to_load_path} for prediction.")
+        loaded_data = torch.load(checkpoint_to_load_path, map_location=device)
+        if isinstance(loaded_data, dict) and 'model_state_dict' in loaded_data:
+            model.load_state_dict(loaded_data['model_state_dict'])
+        else:
+            model.load_state_dict(loaded_data)
 
+        logging.info("Preparing test dataset...")
+        test_dataset = GraphDataset(args.test_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
+        logging.info("Generating predictions for the test set...")
+        test_predictions = evaluate_model(
+            model=model, loader=test_loader, device=device,
+            criterion_obj=None, criterion_type=args.criterion, is_validation=False
+        )
+
+        output_prediction_path = os.path.join(logs_folder, f"predictions_{test_dir_name}.txt")
+        save_predictions(test_predictions, output_prediction_path) # Assicurati che save_predictions accetti il path
+        logging.info(f"Predictions saved to {output_prediction_path}")
+
+    logging.info("Main script finished.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
+
+    # Dataset and Paths
     parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod"], help="Type of loss to use (ce, gcod)")
-    parser.add_argument("--lr_model", type=float, default=0.001, help="learning rate for the main GNN model (default: 0.001)") # Learning rate per il modello
-    parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in GCOD (default: 0.0001)")
-    parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss when updating model parameters (default: 0.3)")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
-    parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Save or not the predictions")
-    parser.add_argument("--num_checkpoints", type=int, default=5, help="Number of intermediate checkpoints to save (0 for none, 1 for end only).")
-    parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
-    parser.add_argument('--gnn', type=str, default='gin', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin)')
-    parser.add_argument('--drop_ratio', type=float, default=0.5, help='dropout ratio (default: 0.5)')
-    parser.add_argument('--num_layer', type=int, default=5, help='number of GNN message passing layers (default: 5)')
-    parser.add_argument('--emb_dim', type=int, default=300, help='dimensionality of hidden units in GNNs (default: 300)')
-    parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
-    parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
-    parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD')
-    parser.add_argument('--ret', type=str, default=None, help='for kaggle')
+
+    # Model Architecture
+    parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
+    parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN message passing layers (default: 3)')
+    parser.add_argument('--emb_dim', type=int, default=128, help='Dimensionality of hidden units in GNNs (default: 128)')
+    parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio (default: 0.1)')
+    parser.add_argument('--transformer_heads', type=int, default=4, help='Number of attention heads for TransformerConv (default: 4)')
+    parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (default: 7, VERIFY FROM DATASET)')
+    parser.add_argument('--jk_mode', type=str, default="last", choices=["last", "sum", "mean", "concat"], help="Jumping Knowledge mode (default: last)")
+    parser.add_argument('--graph_pooling', type=str, default="attention", choices=["sum", "mean", "max", "attention", "set2set"], help="Graph pooling method (default: mean)")
+    parser.add_argument('--no_residual', action='store_true', help='Disable residual connections in GNN layers.')
+
+    # Training Hyperparameters
+    parser.add_argument('--epochs', type=int, default=70, help='Number of epochs to train (default: 100)')
+    parser.add_argument('--batch_size', type=int, default=32, help='Input batch size for training (default: 32)')
+    parser.add_argument('--lr_model', type=float, default=1e-3, help='Learning rate for the GNN model (default: 0.001)')
+    parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty) for AdamW (default: 1e-5)')
+    parser.add_argument('--gradient_clipping', type=float, default=1.0, help='Max norm for gradient clipping (0 to disable, default: 1.0)')
+    parser.add_argument('--val_split_ratio', type=float, default=0.15, help='Fraction of training data to use for validation (default: 0.15)')
+    parser.add_argument('--early_stopping_patience', type=int, default=10, help='Patience for early stopping (0 to disable, default: 10)')
+
+    # Loss Function and GCOD specific
+    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod"], help="Type of loss to use (default: ce)")
+    parser.add_argument('--label_smoothing', type=float, default=0.1, help='Amount of label smoothing for CE loss (default: 0.1, use 0 for no smoothing)')
+    parser.add_argument("--lr_u", type=float, default=0.01, help="Learning rate for 'u' parameters in GCOD (default: 0.01)")
+    parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss (default: 0.7)")
+    parser.add_argument('--epoch_boost', type=int, default=0, help='Number of initial epochs with CE loss before GCOD (default: 0)')
+
+    # Runtime and Misc
+    parser.add_argument('--device', type=int, default=0, help='GPU device ID to use if available (default: 0, -1 for CPU)')
+    parser.add_argument('--seed', type=int, default=777, help='Random seed (default: 777)')
+    parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Generate and save predictions on the test set (default: 1)")
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of Dataloader workers (default: 0 for main process, >0 for multiprocessing)')
 
     args = parser.parse_args()
-    main(args)
 
+    if args.gnn_type == 'transformer':
+        if args.emb_dim % args.transformer_heads != 0:
+            logging.warning(
+                f"For TransformerConv, emb_dim ({args.emb_dim}) "
+                f"should ideally be divisible by transformer_heads ({args.transformer_heads}) "
+                f"for even distribution. Our CustomTransformerConvBlock handles this, "
+                f"but it's worth noting."
+            )
+
+    main(args)

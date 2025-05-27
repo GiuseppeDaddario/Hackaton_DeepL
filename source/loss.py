@@ -11,8 +11,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-eps = 1e-7 # Mantieni il tuo valore di epsilon
+eps = 1e-7
 
+
+# ==================================================================================
+# GCOD loss class
+# ==================================================================================
 class gcodLoss(nn.Module):
     def __init__(self, sample_labels_numpy, device, num_examp, num_classes, gnn_embedding_dim, total_epochs):
         super(gcodLoss, self).__init__()
@@ -194,3 +198,44 @@ class gcodLoss(nn.Module):
         # Oppure la funzione train chiamerà direttamente calculate_loss_components
         return self.calculate_loss_components(batch_original_indices, gnn_logits_batch, true_labels_batch_one_hot,
                                               gnn_embeddings_batch, batch_iter_num, current_epoch, atrain_overall_accuracy)
+
+
+
+# ==================================================================================
+# Label Smoothing Cross Entropy (args.criterion == 'ce')
+# ==================================================================================
+class LabelSmoothingCrossEntropy(nn.Module):
+    def __init__(self, classes, smoothing=0.1, dim=-1):
+        super(LabelSmoothingCrossEntropy, self).__init__()
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+        self.cls = classes
+        self.dim = dim
+        if smoothing > 0:
+            if classes <= 1:
+                raise ValueError("Label smoothing requires num_classes > 1.")
+            self.smooth_value = self.smoothing / (self.cls - 1)
+        else:
+            self.smooth_value = 0
+
+
+    def forward(self, pred_logits, target_indices):
+        """
+        Args:
+            pred_logits (Tensor): Logits dal modello (N, C).
+            target_indices (Tensor): Etichette vere (N), indici interi.
+        """
+        pred_log_softmax = pred_logits.log_softmax(dim=self.dim) # (N, C)
+
+        with torch.no_grad():
+            # Crea la distribuzione target smooth
+            true_dist = torch.zeros_like(pred_log_softmax) # (N, C)
+            if self.smoothing > 0:
+                true_dist.fill_(self.smooth_value)
+            # Scatter assegna 'self.confidence' alle posizioni delle etichette vere
+            true_dist.scatter_(1, target_indices.data.unsqueeze(1).long(), self.confidence)
+            # Se smoothing è 0, confidence è 1.0 e smooth_value è 0, quindi è one-hot.
+
+        # Calcola la KL divergence (o cross-entropy equivalente)
+        # mean(sum(-true_dist * pred_log_softmax, dim))
+        return torch.mean(torch.sum(-true_dist * pred_log_softmax, dim=self.dim))
