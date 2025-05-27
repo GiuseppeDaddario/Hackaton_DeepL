@@ -98,13 +98,9 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         path_D = args.train_path_D
         for i in range(1,4):
             # Cleaning RAM and GPU
-            try:
-                del train_dataset
-                del train_loader_for_batches
-                del full_train_loader_for_atrain
-            except NameError as e:
-                print(e)
-                pass
+            if 'train_dataset' in locals(): del train_dataset
+            if 'train_loader_for_batches' in locals(): del train_loader_for_batches
+            if 'full_train_loader_for_atrain' in locals(): del full_train_loader_for_atrain
 
             gc.collect()
             if torch.cuda.is_available():
@@ -125,8 +121,8 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
                 train_dataset = GraphDataset(path_D, transform=add_zeros if "add_zeros" in globals() else None)
 
             print(f"Loading train dataset into DataLoader...")
-            if train_loader_for_batches is None:
-                train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+
+            train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
             full_train_loader_for_atrain = None
             if args.criterion in ["ncod", "gcod"]:
@@ -243,10 +239,9 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         print(f"Loaded best model from {checkpoint_path_best}")
         for i in range(1,4):
             # Cleaning RAM and GPU
-            try:
-                del train_dataset
-            except NameError:
-                pass
+            if 'train_dataset' in locals(): del train_dataset
+            if 'train_loader_for_batches' in locals(): del train_loader_for_batches
+            if 'full_train_loader_for_atrain' in locals(): del full_train_loader_for_atrain
 
             gc.collect()
             if torch.cuda.is_available():
