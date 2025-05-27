@@ -93,7 +93,7 @@ def main(args):
 
         if args.load_dataset and os.path.exists(args.load_dataset):
             print(f"Loading dataset from {args.load_dataset}...")
-            train_dataset = torch.load(args.load_dataset)
+            train_dataset = torch.load(args.load_dataset, weights_only=False)
         else:
             print("Loading dataset from raw path...")
             train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
