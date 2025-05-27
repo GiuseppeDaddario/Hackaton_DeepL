@@ -217,9 +217,6 @@ def main(args):
                 epochs_no_improve += 1
                 logging.info(f"No improvement for {epochs_no_improve} epoch(s). Best Val Acc: {best_val_accuracy*100:.2f}%")
 
-            if args.early_stopping_patience > 0 and epochs_no_improve >= args.early_stopping_patience:
-                logging.info(f"Early stopping at epoch {epoch+1}.")
-                break
 
         total_training_time = time.time() - start_time_train
         logging.info(f"Training finished. Total time: {total_training_time:.2f}s.")
@@ -290,7 +287,6 @@ if __name__ == "__main__":
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty) for AdamW (default: 1e-5)')
     parser.add_argument('--gradient_clipping', type=float, default=1.0, help='Max norm for gradient clipping (0 to disable, default: 1.0)')
     parser.add_argument('--val_split_ratio', type=float, default=0.15, help='Fraction of training data to use for validation (default: 0.15)')
-    parser.add_argument('--early_stopping_patience', type=int, default=10, help='Patience for early stopping (0 to disable, default: 10)')
 
     # Loss Function and GCOD specific
     parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod"], help="Type of loss to use (default: ce)")
