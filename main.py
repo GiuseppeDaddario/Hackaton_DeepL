@@ -90,7 +90,7 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
     #if os.path.exists(checkpoint_path_best) and not args.train_path:
      #   model.load_state_dict(torch.load(checkpoint_path_best))
       #  print(f"Loaded best model from {checkpoint_path_best}")
-    names = ["A", "B", "C", "D"]
+
     if args.train_all == 1:
         path_A = args.train_path_A
         path_B = args.train_path_B
@@ -107,17 +107,21 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            print(f"Loading train dataset {names[i]}...")
+
             if i == 1:
+                print(f"Loading train dataset A...")
                 train_dataset = GraphDataset(path_A, transform=add_zeros if "add_zeros" in globals() else None)
             elif i == 2:
+                print(f"Loading train dataset B...")
                 train_dataset = GraphDataset(path_B, transform=add_zeros if "add_zeros" in globals() else None)
             elif i == 3:
+                print(f"Loading train dataset C...")
                 train_dataset = GraphDataset(path_C, transform=add_zeros if "add_zeros" in globals() else None)
             else:
+                print(f"Loading train dataset D...")
                 train_dataset = GraphDataset(path_D, transform=add_zeros if "add_zeros" in globals() else None)
 
-            print(f"Loading train dataset {i} into DataLoader...")
+            print(f"Loading train dataset into DataLoader...")
             if train_loader_for_batches is None:
                 train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
