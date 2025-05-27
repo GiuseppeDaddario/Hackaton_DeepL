@@ -31,62 +31,60 @@ from torch_geometric.data import Batch, Data
 from torch.utils.data.dataloader import default_collate
 import torch
 
-def _debug_print_collate(message):
-    # Temporaneamente, stampa sempre per il debug
-    print(f"[COLLATE DEBUG] {message}")
-
 def pyg_data_list_to_dict_collate(data_list):
-    _debug_print_collate(f"Inizio collate. Lunghezza data_list: {len(data_list)}")
-    if not data_list:
-        _debug_print_collate("data_list vuota, ritorno {}")
-        return {}
-
+    if not data_list: return {}
     valid_items = [item for item in data_list if isinstance(item, (Data, Batch))]
-    if not valid_items:
-        _debug_print_collate(f"Nessun item valido Data/Batch. Ritorno default_collate. Originale: {data_list}")
-        return default_collate(data_list)
-    _debug_print_collate(f"Numero di valid_items: {len(valid_items)}")
+    if not valid_items: return default_collate(data_list)
 
     try:
         temp_pyg_batch_on_cpu = Batch.from_data_list(valid_items)
-        _debug_print_collate("Batch.from_data_list eseguito con successo.")
-        # _debug_print_collate(f"temp_pyg_batch_on_cpu.keys: {list(temp_pyg_batch_on_cpu.keys)}")
-        # _debug_print_collate(f"temp_pyg_batch_on_cpu.num_graphs: {temp_pyg_batch_on_cpu.num_graphs}")
     except Exception as e:
-        _debug_print_collate(f"ERRORE CRITICO in Batch.from_data_list: {e}")
-        # Stampa dettagli sugli items che hanno causato l'errore
-        for i, item_err in enumerate(valid_items):
-            _debug_print_collate(f"  Item {i} (tipo {type(item_err)}): {item_err.to_dict() if hasattr(item_err, 'to_dict') else item_err}")
+        print(f"ERRORE CRITICO in Batch.from_data_list: {e}")
+        # ... (stampe di debug per valid_items) ...
+        raise e
+
+    # Usa .to_dict() per ottenere un dizionario Python degli attributi del batch
+    # Questo dovrebbe "appiattire" l'oggetto Batch.
+    try:
+        batch_attributes_as_dict = temp_pyg_batch_on_cpu.to_dict()
+    except Exception as e:
+        print(f"ERRORE CRITICO in temp_pyg_batch_on_cpu.to_dict(): {e}")
+        print(f"temp_pyg_batch_on_cpu type: {type(temp_pyg_batch_on_cpu)}")
+        # print(f"temp_pyg_batch_on_cpu keys: {list(temp_pyg_batch_on_cpu.keys) if hasattr(temp_pyg_batch_on_cpu, 'keys') else 'NO KEYS'}")
         raise e
 
     final_plain_dict = {}
-    for key in temp_pyg_batch_on_cpu.keys:
-        if hasattr(temp_pyg_batch_on_cpu, key):
-            value = getattr(temp_pyg_batch_on_cpu, key)
-            if torch.is_tensor(value):
-                final_plain_dict[key] = value.clone()
-            # else:
-            # _debug_print_collate(f"Attributo '{key}' da keys non è un tensore (tipo: {type(value)}). Non incluso.")
+    for key, value in batch_attributes_as_dict.items():
+        if torch.is_tensor(value):
+            final_plain_dict[key] = value.clone() # Clona sempre i tensori
+        elif key == '_num_graphs' or key == 'num_graphs': # num_graphs è un intero
+            final_plain_dict['_num_graphs'] = value # Rinomina in _num_graphs se necessario
+        # Ignora altri attributi non tensoriali da .to_dict() a meno che non siano specificamente necessari
+        # e sai che sono tipi base Python.
+
+    # Assicurati che _num_graphs sia presente
+    if '_num_graphs' not in final_plain_dict:
+        if hasattr(temp_pyg_batch_on_cpu, 'num_graphs'):
+            final_plain_dict['_num_graphs'] = temp_pyg_batch_on_cpu.num_graphs
+        else:
+            final_plain_dict['_num_graphs'] = len(valid_items)
 
     if 'batch' not in final_plain_dict and hasattr(temp_pyg_batch_on_cpu, 'batch') and torch.is_tensor(temp_pyg_batch_on_cpu.batch):
         final_plain_dict['batch'] = temp_pyg_batch_on_cpu.batch.clone()
     if 'ptr' not in final_plain_dict and hasattr(temp_pyg_batch_on_cpu, 'ptr') and torch.is_tensor(temp_pyg_batch_on_cpu.ptr):
         final_plain_dict['ptr'] = temp_pyg_batch_on_cpu.ptr.clone()
 
-    if hasattr(temp_pyg_batch_on_cpu, 'num_graphs'):
-        final_plain_dict['_num_graphs'] = temp_pyg_batch_on_cpu.num_graphs
-    else:
-        final_plain_dict['_num_graphs'] = len(valid_items)
-
-    _debug_print_collate("Contenuto di final_plain_dict prima del return:")
+    # Stampa di debug
+    print("[COLLATE DEBUG] Contenuto di final_plain_dict (da .to_dict()) prima del return:")
     for k_final, v_final in final_plain_dict.items():
         if torch.is_tensor(v_final):
-            _debug_print_collate(f"  '{k_final}': Tensor, shape={v_final.shape}, dtype={v_final.dtype}, device={v_final.device}")
+            print(f"  '{k_final}': Tensor, shape={v_final.shape}, dtype={v_final.dtype}, device={v_final.device}")
         else:
-            _debug_print_collate(f"  '{k_final}': {type(v_final)}, value={v_final}")
-    _debug_print_collate("-" * 30)
+            print(f"  '{k_final}': {type(v_final)}, value={v_final}")
+    print("-" * 30)
 
     return final_plain_dict
+
 def calculate_global_train_accuracy(model, full_train_loader, device):
     model.eval()
     correct = 0
@@ -180,12 +178,13 @@ def _run_on_tpu(rank, args):
 
     if args.train_path:
         if is_master: logging.info("Preparing train dataset...")
-        # MODIFICA: Passa emb_dim a add_zeros se necessario per definire la dimensione delle feature
-        # Assicurati che GraphDataset e add_zeros gestiscano correttamente la creazione di `data.x`
+        transform_function = lambda data_item: add_zeros(data_item, node_feature_dim=args.emb_dim)
+
         train_dataset = GraphDataset(
             args.train_path,
-            transform=lambda data: add_zeros(data, node_feature_dim=args.emb_dim),
-            node_feature_dim_for_json_load=args.emb_dim # Passalo se dictToGraphObject lo usa
+            transform_lambda=transform_function, # Passa la lambda creata
+            node_feature_dim_for_json_load=args.emb_dim, # Se dictToGraphObject ne ha bisogno
+            node_feature_dim_for_add_zeros=args.emb_dim # Ridondante se la lambda lo gestisce, ma per chiarezza
         )
 
         if is_master: logging.info(f"Train dataset length: {len(train_dataset)}")
@@ -372,10 +371,12 @@ def _run_on_tpu(rank, args):
             return # Esce solo il master
 
         logging.info("Preparing test dataset for prediction...")
+        transform_function_test = lambda data_item: add_zeros(data_item, node_feature_dim=args.emb_dim)
         test_dataset = GraphDataset(
             args.test_path,
-            transform=lambda data: add_zeros(data, node_feature_dim=args.emb_dim),
-            node_feature_dim_for_json_load=args.emb_dim
+            transform_lambda=transform_function_test,
+            node_feature_dim_for_json_load=args.emb_dim,
+            node_feature_dim_for_add_zeros=args.emb_dim
         )
 
         if len(test_dataset) == 0:
