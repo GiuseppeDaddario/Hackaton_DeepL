@@ -16,7 +16,7 @@ from source.train import train
 from source.dataLoader import add_zeros
 
 from source.loadData import GraphDataset
-from source.loss import ncodLoss, gcodLoss
+from source.loss import gcodLoss
 from source.models import GNN
 from source.utils import set_seed
 
@@ -101,7 +101,7 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         if train_loader_for_batches is None:
             train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         full_train_loader_for_atrain = None
-        if args.criterion in ["ncod", "gcod"]:
+        if args.criterion == "gcod":
             print("Preparing full train loader for atrain calculation...")
             full_train_loader_for_atrain = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -113,20 +113,7 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         loss_function_obj = None
         optimizer_loss_params = None
 
-        if args.criterion == "ncod":
-            # ... (codice per ncodLoss invariato)
-            loss_function_obj = ncodLoss(
-                sample_labels=y_values_numpy,
-                device=device,
-                num_examp=len(train_dataset),
-                num_classes=num_dataset_classes,
-                ratio_consistency=0, # Esempio, usa i tuoi args
-                ratio_balance=0,   # Esempio, usa i tuoi args
-                encoder_features=args.emb_dim,
-                total_epochs=args.epochs
-            )
-            optimizer_loss_params = optim.SGD(loss_function_obj.parameters(), lr=args.lr_u)
-        elif args.criterion == "gcod":
+        if args.criterion == "gcod":
             loss_function_obj = gcodLoss(
                 sample_labels_numpy=y_values_numpy,
                 device=device,
@@ -160,7 +147,7 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
         for epoch in range(num_epochs):
             if epoch < args.epoch_boost:
                 print("Current in boosting: CE loss")
-            if args.criterion in ["ncod", "gcod"] and full_train_loader_for_atrain is not None:
+            if args.criterion == "gcod" and full_train_loader_for_atrain is not None:
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
             avg_batch_acc_epoch, epoch_loss_avg = train(
@@ -181,7 +168,7 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
             )
 
             # Formatta il logging di atrain per evitare errore se non usato
-            atrain_log_str = f"{atrain_global:.4f}" if args.criterion in ['ncod', 'gcod'] else 'N/A'
+            atrain_log_str = f"{atrain_global:.4f}" if args.criterion =='gcod'  else 'N/A'
             print(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}")
             logging.info(f"Epoch {epoch + 1}/{num_epochs}, Avg Batch Train Acc: {avg_batch_acc_epoch:.2f}%, Epoch Train Loss: {epoch_loss_avg:.4f}, Atrain: {atrain_log_str}")
 
@@ -224,9 +211,9 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "ncod", "gcod"], help="Type of loss to use (ce, ncod, gcod)")
+    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod"], help="Type of loss to use (ce, gcod)")
     parser.add_argument("--lr_model", type=float, default=0.001, help="learning rate for the main GNN model (default: 0.001)") # Learning rate per il modello
-    parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in NCOD/GCOD (default: 0.0001)")
+    parser.add_argument("--lr_u", type=float, default=0.01, help="lr for u parameters in GCOD (default: 0.0001)")
     parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss when updating model parameters (default: 0.3)")
     parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
     parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Save or not the predictions")
