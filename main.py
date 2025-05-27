@@ -100,7 +100,10 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
             # Cleaning RAM and GPU
             try:
                 del train_dataset
-            except NameError:
+                del train_loader_for_batches
+                del full_train_loader_for_atrain
+            except NameError as e:
+                print(e)
                 pass
 
             gc.collect()
