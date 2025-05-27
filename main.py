@@ -47,23 +47,24 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
 ##                                                  ##
 ######################################################
 
-def main(args):
+def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
     num_checkpoints = args.num_checkpoints if args.num_checkpoints else 3
     num_dataset_classes = 6
 
     print("Building the model...")
-    if args.gnn == 'gin':
-        model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-    elif args.gnn == 'gin-virtual':
-        model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-    elif args.gnn == 'gcn':
-        model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
-    elif args.gnn == 'gcn-virtual':
-        model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
-    else:
-        raise ValueError('Invalid GNN type')
+    if model is None:
+        if args.gnn == 'gin':
+            model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+        elif args.gnn == 'gin-virtual':
+            model = GNN(gnn_type = 'gin', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+        elif args.gnn == 'gcn':
+            model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+        elif args.gnn == 'gcn-virtual':
+            model = GNN(gnn_type = 'gcn', num_class = num_dataset_classes, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+        else:
+            raise ValueError('Invalid GNN type')
 
     optimizer_model = torch.optim.Adam(model.parameters(), lr=args.lr_model, weight_decay=1e-4) # Usa args.lr_model
 
@@ -92,10 +93,12 @@ def main(args):
     if args.train_path:
         print("Preparing train dataset...")
 
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
+        if train_dataset is None:
+            train_dataset = GraphDataset(args.train_path, transform=add_zeros if "add_zeros" in globals() else None)
 
         print("Loading train dataset into DataLoader...")
-        train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        if train_loader_for_batches is None:
+            train_loader_for_batches = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         full_train_loader_for_atrain = None
         if args.criterion in ["ncod", "gcod"]:
             print("Preparing full train loader for atrain calculation...")
@@ -209,7 +212,7 @@ def main(args):
         save_predictions(predictions, args.test_path)
         print("Predictions saved successfully.")
 
-    return train_dataset,train_loader_for_batches,model
+
 
 
 if __name__ == "__main__":
