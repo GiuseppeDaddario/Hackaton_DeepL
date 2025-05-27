@@ -29,51 +29,52 @@ set_seed()
 
 from torch_geometric.data import Batch, Data
 from torch.utils.data.dataloader import default_collate
-import torch # Assicurati che torch sia importato
+import torch
 
 def pyg_data_list_to_dict_collate(data_list):
     if not data_list:
         return {}
 
-    valid_items = [item for item in data_list if isinstance(item, (Data, Batch)) and hasattr(item, 'keys')]
+    valid_items = [item for item in data_list if isinstance(item, (Data, Batch))]
     if not valid_items:
-        print(f"Warning: pyg_data_list_to_dict_collate riceve dati non validi o vuoti: {data_list}")
-        return default_collate(data_list) # O {} se data_list era vuota ma valid_items no.
+        return default_collate(data_list) # Fallback se nessun item valido
 
     try:
-        temp_cpu_batch = Batch.from_data_list(valid_items)
+        temp_pyg_batch_on_cpu = Batch.from_data_list(valid_items)
     except Exception as e:
-        print(f"Errore in Batch.from_data_list: {e}. Dati: {valid_items}")
+
+        print(f"ERRORE CRITICO in Batch.from_data_list durante la collazione: {e}")
+        print(f"Lunghezza valid_items: {len(valid_items)}")
+        if valid_items:
+            print(f"Primo item in valid_items (tipo {type(valid_items[0])}):")
+            if hasattr(valid_items[0], 'to_dict'):
+                print(valid_items[0].to_dict())
+            else:
+                print(valid_items[0])
         raise e
 
-    final_batch_dict = {}
-
-    attributes_to_check = ['x', 'edge_index', 'edge_attr', 'y', 'pos', 'face', 'original_idx']
-
-    for attr_name in attributes_to_check:
-        if hasattr(temp_cpu_batch, attr_name):
-            value = getattr(temp_cpu_batch, attr_name)
+    final_plain_dict = {}
+    for key in temp_pyg_batch_on_cpu.keys:
+        if hasattr(temp_pyg_batch_on_cpu, key):
+            value = getattr(temp_pyg_batch_on_cpu, key)
             if torch.is_tensor(value):
-                final_batch_dict[attr_name] = value
+                # Clona il tensore per evitare problemi di riferimento e assicurare che sia "pulito".
+                final_plain_dict[key] = value.clone()
 
-    if hasattr(temp_cpu_batch, 'batch') and torch.is_tensor(temp_cpu_batch.batch):
-        final_batch_dict['batch'] = temp_cpu_batch.batch
+    if 'batch' not in final_plain_dict and hasattr(temp_pyg_batch_on_cpu, 'batch') and torch.is_tensor(temp_pyg_batch_on_cpu.batch):
+        final_plain_dict['batch'] = temp_pyg_batch_on_cpu.batch.clone()
 
-    if hasattr(temp_cpu_batch, 'ptr') and torch.is_tensor(temp_cpu_batch.ptr):
-        final_batch_dict['ptr'] = temp_cpu_batch.ptr
+    if 'ptr' not in final_plain_dict and hasattr(temp_pyg_batch_on_cpu, 'ptr') and torch.is_tensor(temp_pyg_batch_on_cpu.ptr):
+        final_plain_dict['ptr'] = temp_pyg_batch_on_cpu.ptr.clone()
 
-    # Aggiungi _num_graphs (intero)
-    final_batch_dict['_num_graphs'] = temp_cpu_batch.num_graphs
+    # Aggiungi _num_graphs (un intero, non un tensore che XLA sposterà, ma utile per la ricostruzione).
+    if hasattr(temp_pyg_batch_on_cpu, 'num_graphs'):
+        final_plain_dict['_num_graphs'] = temp_pyg_batch_on_cpu.num_graphs
+    else:
+        final_plain_dict['_num_graphs'] = len(valid_items) # Fallback
 
-    # Verifica se mancano attributi essenziali che dovrebbero essere tensori
-    if 'x' not in final_batch_dict and temp_cpu_batch.num_nodes > 0: # Se ci sono nodi, ci si aspetta x
-        print(f"Warning: 'x' (node features) non trovato o non è un tensore nel batch per MpDeviceLoader.")
-        pass
-    if 'edge_index' not in final_batch_dict:
-        print(f"Warning: 'edge_index' non trovato o non è un tensore nel batch per MpDeviceLoader.")
-        pass
+    return final_plain_dict
 
-    return final_batch_dict
 def calculate_global_train_accuracy(model, full_train_loader, device):
     model.eval()
     correct = 0
@@ -169,8 +170,11 @@ def _run_on_tpu(rank, args):
         if is_master: logging.info("Preparing train dataset...")
         # MODIFICA: Passa emb_dim a add_zeros se necessario per definire la dimensione delle feature
         # Assicurati che GraphDataset e add_zeros gestiscano correttamente la creazione di `data.x`
-        train_dataset = GraphDataset(args.train_path,
-                                     transform=lambda data: add_zeros(data, node_feature_dim=args.emb_dim), args_emb_dim=args.emb_dim)
+        train_dataset = GraphDataset(
+            args.train_path,
+            transform=lambda data: add_zeros(data, node_feature_dim=args.emb_dim),
+            node_feature_dim_for_json_load=args.emb_dim # Passalo se dictToGraphObject lo usa
+        )
 
         if is_master: logging.info(f"Train dataset length: {len(train_dataset)}")
         if len(train_dataset) == 0:
@@ -356,9 +360,11 @@ def _run_on_tpu(rank, args):
             return # Esce solo il master
 
         logging.info("Preparing test dataset for prediction...")
-        # MODIFICA: Applica la trasformazione anche al test_dataset
-        test_dataset = GraphDataset(args.test_path,
-                                    transform=lambda data: add_zeros(data, node_feature_dim=args.emb_dim), args_emb_dim=args.emb_dim)
+        test_dataset = GraphDataset(
+            args.test_path,
+            transform=lambda data: add_zeros(data, node_feature_dim=args.emb_dim),
+            node_feature_dim_for_json_load=args.emb_dim
+        )
 
         if len(test_dataset) == 0:
             logging.error("Test dataset is empty. Cannot perform prediction.")
