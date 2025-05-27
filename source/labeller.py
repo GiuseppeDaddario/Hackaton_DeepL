@@ -2,13 +2,17 @@
 import argparse
 import os
 import torch
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from torch_geometric.loader import DataLoader
 
 ## Modular imports
 from source.evaluation import evaluate
 from source.loadData import GraphDataset
 from source.models import GNN
-from source.statistics import save_predictions, save_predictions_1
+from source.statistics import save_predictions_1
 from source.utils import set_seed
 from source.dataLoader import add_zeros
 
@@ -18,18 +22,23 @@ from source.dataLoader import add_zeros
 #####################################
 
 DATASET = "D"
-WEIGHT_PATH = "checkpoints/model_sequential_final.pth"  # The path to the checkpoint you want to load
+WEIGHT_PATH = "../checkpoints/model_sequential_final.pth"  # The path to the checkpoint you want to load
 GNN_TYPE = "gin"                                        # o "gcn", "gin-virtual", etc.
 DROP_RATIO = 0.5                                        # Dropout ratio for the GNN
 NUM_LAYER = 5                                           # Number of GNN layers
 EMB_DIM = 300                                           # Dimensionality of hidden units in GNNs
 BATCH_SIZE = 32                                         # Input batch size for training
-##
 
 
-# ==== DYNAMICALLY SETTING THE PATHS ==== ##
-TEST_PATH = f"../datasets/{DATASET}/test.json.gz"
-OUTPUT_PATH = f"predictions/{DATASET}_Predicted.csv"
+
+#####
+TEST_PATH = f"../../datasets/{DATASET}/test.json.gz"
+OUTPUT_PATH = f"../submission/testset_{DATASET}.csv"
+# Calcola il path assoluto rispetto a questo script
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+WEIGHT_PATH = os.path.join(CURRENT_DIR, WEIGHT_PATH)
+OUTPUT_PATH = os.path.join(CURRENT_DIR, OUTPUT_PATH)
+TEST_PATH = os.path.join(CURRENT_DIR, TEST_PATH)
 ############################################
 ############################################
 
@@ -80,10 +89,6 @@ def main(args):
     save_predictions_1(predictions, output_path)
     
     
-    
-    
-    
-    print("Predictions saved!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build the testset with predictions starting from a checkpoint.")

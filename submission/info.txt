@@ -1,5 +1,5 @@
 Training session:
-Epochs: 20
+Epochs: 1
 Parameters:
  - Criterion: gcod
  - LR model: 0.001

@@ -38,9 +38,11 @@ def sequential_training(args):
 
     ## End of loading checkpoint
 
+
     for i, train_path in enumerate(datasets_paths):
         print(f"\n--- Training on dataset {chr(ord('A') + i)}: {train_path} ---")
         args.train_path = train_path
+        args.test_path = train_path
         train_dataset, model, train_loader = main(
             args,
             train_dataset=train_dataset,
@@ -90,7 +92,6 @@ def sequential_training(args):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Sequential training over datasets A-D")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to test dataset")
     parser.add_argument("--device", type=int, default=0)
     # aggiungi altri parametri se vuoi
     args = parser.parse_args()
@@ -106,7 +107,7 @@ if __name__ == "__main__":
     args.num_layer = 5
     args.emb_dim = 300
     args.batch_size = 32
-    args.epochs = 20
+    args.epochs = 1
     args.epoch_boost = 0
 
     sequential_training(args)
