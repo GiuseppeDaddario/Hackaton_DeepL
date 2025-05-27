@@ -195,6 +195,11 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
 
         plot_training_progress(train_losses_history, train_accuracies_history, os.path.join(logs_folder, "plots"))
 
+        if args.ret == "all":
+            return train_dataset, model, train_loader_for_batches
+        elif args.ret == "model":
+            return model
+
     # (Sezione predict invariata)
     if args.predict == 1:
         if not os.path.exists(checkpoint_path_best):
@@ -233,6 +238,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 100)')
     parser.add_argument('--epoch_boost', type=int, default=0, help='number of epochs to do with CE loss before starting with GCOD')
+    parser.add_argument('--ret', type=str, default=None, help='for kaggle')
 
     args = parser.parse_args()
     main(args)
