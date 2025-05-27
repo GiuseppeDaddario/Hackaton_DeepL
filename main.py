@@ -69,7 +69,7 @@ def main(args, train_dataset =None ,train_loader_for_batches=None ,model=None):
 
     optimizer_model = torch.optim.Adam(model.parameters(), lr=args.lr_model, weight_decay=1e-4) # Usa args.lr_model
 
-    test_dir_name = os.path.basename(os.path.dirname(args.test_path))
+    test_dir_name = os.path.basename(os.path.dirname(args.test_path_D))
     logs_folder = os.path.join(script_dir, "logs", test_dir_name)
     log_file = os.path.join(logs_folder, "training.log")
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
