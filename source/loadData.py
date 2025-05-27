@@ -194,4 +194,19 @@ class GraphDataset(Dataset):
         if not hasattr(data_obj, 'original_idx') or data_obj.original_idx is None:
             raise ValueError(f"Data object per idx {idx} non ha attributo 'original_idx' o è None.")
 
+        ###DEBUG###
+        print(f"DEBUG Dataset get(idx={idx}):")
+        print(f"  num_nodes: {data_obj.num_nodes}")
+        for attr_key in ['x', 'edge_index', 'edge_attr', 'y', 'original_idx']:
+            if hasattr(data_obj, attr_key):
+                val = getattr(data_obj, attr_key)
+                if torch.is_tensor(val):
+                    print(f"  {attr_key}: Tensor, shape={val.shape}, dtype={val.dtype}")
+                else:
+                    print(f"  {attr_key}: {type(val)}, value={val}")
+            else:
+                print(f"  {attr_key}: NOT PRESENT")
+        print("-" * 20)
+        ###FINE DEBUG###
+
         return data_obj
