@@ -261,7 +261,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         logging.info(f">>> Training completed in {total_training_time:.2f} seconds")
         logging.info("="*60 + "\n")
         plot_training_progress({"train_loss": train_losses_history, "val_loss": val_losses_history},
-                               {"train_acc": train_f1_history, "val_acc": val_f1_history},
+                               {"train_acc": train_accuracy_history, "train_f1": train_f1_history, "val_acc": val_accuracy_history, "val_f1": val_f1_history},
                                os.path.join(logs_folder, "training_plots"))
 
     # --- Predizione sul Test Set ---
