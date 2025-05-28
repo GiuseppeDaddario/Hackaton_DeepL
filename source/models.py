@@ -231,6 +231,12 @@ class CustomGNN(torch.nn.Module):
         return GatedGCNLayer
 
     def forward(self, batch):
+        # Proiezione input iniziale sulle feature dei nodi
+        batch.x = self.input_proj(batch.x)
+
+        # Passa tutto il batch agli altri moduli (GNN, head, ecc.)
         for module in self.children():
+            if module == self.input_proj:
+                continue  # Già applicato
             batch = module(batch)
         return batch
