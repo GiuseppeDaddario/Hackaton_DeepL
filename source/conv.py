@@ -246,7 +246,12 @@ class GatedGCNLayer(pyg_nn.conv.MessagePassing):
     """
     def __init__(self, in_dim, out_dim, dropout, residual, ffn, act='relu',
                  equivstable_pe=False, **kwargs):
-        super().__init__(**kwargs)
+        actual_kwargs_for_super = kwargs.copy() # Copia per non modificare l'originale se non necessario
+        if 'batchnorm' in actual_kwargs_for_super:
+            del actual_kwargs_for_super['batchnorm'] # Rimuovi batchnorm se presente in kwargs
+
+        super().__init__(**actual_kwargs_for_super)
+
         self.activation = register.act_dict[act]
         self.A = pyg_nn.Linear(in_dim, out_dim, bias=True)
         self.B = pyg_nn.Linear(in_dim, out_dim, bias=True)
