@@ -69,13 +69,6 @@ class GNN(torch.nn.Module):
 
 @register_network('custom_gnn')
 class CustomGNN(torch.nn.Module):
-    """
-    GNN model that customizes the torch_geometric.graphgym.models.gnn.GNN
-    to support specific handling of new conv layers.
-    """
-
-@register_network('custom_gnn')
-class CustomGNN(torch.nn.Module):
     def __init__(self, dim_node_feat_raw, dim_out, cfg):
         super().__init__()
         self.cfg = cfg
