@@ -201,11 +201,11 @@ class CustomGNN(torch.nn.Module):
             self.pre_mp = GNNPreMP(
                 dim_in, self.cfg.gnn.dim_inner, self.cfg.gnn.layers_pre_mp)
             dim_in = self.cfg.gnn.dim_inner
-            if dim_in != cfg.gnn.dim_inner:
-                self.input_proj = torch.nn.Linear(dim_in, cfg.gnn.dim_inner)
-                dim_in = cfg.gnn.dim_inner
-            else:
-                self.input_proj = torch.nn.Identity()
+        if dim_in != cfg.gnn.dim_inner:
+            self.input_proj = torch.nn.Linear(dim_in, cfg.gnn.dim_inner)
+            dim_in = cfg.gnn.dim_inner
+        else:
+            self.input_proj = torch.nn.Identity()
 
         print(f"cfg.gnn.dim_inner = {cfg.gnn.dim_inner}, encoder.dim_in = {dim_in}")
         assert self.cfg.gnn.dim_inner == dim_in, \
