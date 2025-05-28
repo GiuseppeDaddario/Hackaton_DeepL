@@ -9,7 +9,7 @@ from torch_geometric.nn import GCNConv
 from torch_geometric.nn import MessagePassing
 from torch_geometric.nn import global_add_pool
 from torch_geometric.utils import degree
-
+from torch_scatter import scatter
 
 
 ### GIN convolution along the graph structure
@@ -239,7 +239,6 @@ class GNN_node_Virtualnode(torch.nn.Module):
         return node_representation
 
 class GatedGCNLayer(pyg_nn.conv.MessagePassing):
-    from torch_scatter import scatter
     """
         GatedGCN layer
         Residual Gated Graph ConvNets
