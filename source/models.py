@@ -1,5 +1,6 @@
 import torch_geometric.graphgym.models.head  # noqa, register module
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch_geometric.graphgym.models.head  # noqa, register module
 import torch_geometric.graphgym.register as register
@@ -7,7 +8,8 @@ from torch_geometric.graphgym.models.gnn import FeatureEncoder, GNNPreMP
 from torch_geometric.graphgym.register import register_network
 from torch_geometric.nn import TransformerConv, \
     global_add_pool, GlobalAttention, global_max_pool, \
-    global_mean_pool
+    global_mean_pool, Linear
+
 
 from source.conv import GatedGCNLayer
 
@@ -195,44 +197,64 @@ class CustomGNN(torch.nn.Module):
         super().__init__()
         self.cfg = cfg
 
-
-        dim_in = dim_node_feat_raw
-        self.input_proj = torch.nn.Linear(dim_in, cfg.gnn.dim_inner)
+        current_node_dim = dim_node_feat_raw
 
         if self.cfg.gnn.layers_pre_mp > 0:
             self.pre_mp = GNNPreMP(
-                dim_in, self.cfg.gnn.dim_inner, self.cfg.gnn.layers_pre_mp)
-            dim_in = self.cfg.gnn.dim_inner
-        if dim_in != cfg.gnn.dim_inner:
-            self.input_proj = torch.nn.Linear(dim_in, cfg.gnn.dim_inner)
-            dim_in = cfg.gnn.dim_inner
+                current_node_dim, self.cfg.gnn.dim_inner, self.cfg.gnn.layers_pre_mp)
+            current_node_dim = self.cfg.gnn.dim_inner
+            self.input_proj = nn.Identity()
         else:
-            self.input_proj = torch.nn.Identity()
+            self.pre_mp = nn.Identity()
+            if current_node_dim != self.cfg.gnn.dim_inner:
+                self.input_proj = Linear(current_node_dim, self.cfg.gnn.dim_inner)
+                current_node_dim = self.cfg.gnn.dim_inner
+            else:
+                self.input_proj = nn.Identity()
 
-        #print(f"cfg.gnn.dim_inner = {cfg.gnn.dim_inner}, encoder.dim_in = {dim_in}")
-        assert self.cfg.gnn.dim_inner == dim_in, \
-            "The inner and hidden dims must match."
+        assert self.cfg.gnn.dim_inner == current_node_dim, \
+            "The inner and hidden dims must match after node feature projection."
 
-        conv_model = self.build_conv_model(self.cfg.gnn.layer_type)
-        layers = []
+        dim_edge_feat_raw_hardcoded = 7
+        target_edge_dim = self.cfg.gnn.dim_inner
+
+        if dim_edge_feat_raw_hardcoded > 0:
+            if dim_edge_feat_raw_hardcoded != target_edge_dim:
+                self.edge_input_proj = Linear(dim_edge_feat_raw_hardcoded, target_edge_dim)
+            else:
+                self.edge_input_proj = nn.Identity()
+        else:
+            self.edge_input_proj = nn.Identity()
+
+        conv_class = self.build_conv_model(self.cfg.gnn.layer_type)
+
+        gnn_layers_list = []
+        dim_for_gnn_conv = self.cfg.gnn.dim_inner
+
         for _ in range(self.cfg.gnn.layers_mp):
-            layers.append(conv_model(dim_in,
-                                     dim_in,
-                                     dropout=self.cfg.gnn.dropout,
-                                     residual=self.cfg.gnn.residual,
-                                     ffn=self.cfg.gnn.ffn))
-        self.gnn_layers = torch.nn.Sequential(*layers)
+            gnn_layers_list.append(conv_class(dim_for_gnn_conv,
+                                              dim_for_gnn_conv,
+                                              dropout=self.cfg.gnn.dropout,
+                                              residual=self.cfg.gnn.residual,
+                                              ffn=self.cfg.gnn.ffn,
+                                              act=self.cfg.gnn.act,
+                                              batchnorm=self.cfg.gnn.batchnorm
+                                              ))
+        self.gnn_layers = nn.Sequential(*gnn_layers_list)
 
-
-        GNNHead = register.head_dict[self.cfg.gnn.head]
-        self.post_mp = GNNHead(dim_in=self.cfg.gnn.dim_inner, dim_out=dim_out)
-
+        GNNHead_class = register.head_dict[self.cfg.gnn.head]
+        self.post_mp = GNNHead_class(dim_in=self.cfg.gnn.dim_inner, dim_out=dim_out)
     def build_conv_model(self, model_type):
         return GatedGCNLayer
 
     def forward(self, batch):
         # Proiezione input iniziale sulle feature dei nodi
         batch.x = self.input_proj(batch.x)
+
+    # >>> AGGIUNGI QUESTO <<<
+        if hasattr(batch, 'edge_attr') and batch.edge_attr is not None:
+            batch.edge_attr = self.edge_input_proj(batch.edge_attr) # Proietta le feature degli archi
+            # ...
 
         # Passa tutto il batch agli altri moduli (GNN, head, ecc.)
         for module in self.children():
