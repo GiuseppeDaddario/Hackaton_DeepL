@@ -97,11 +97,11 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             ),
             gnn=SimpleNamespace(
                 head='mlp_graph',             # Usato per GNNHeadPlaceholder
-                layers_mp=4,
+                layers_mp=2,
                 layer_type='gatedgcn',      # Usato per GatedGCNLayer
                 layers_pre_mp=0,
                 layers_post_mp=2,           # Usato in GNNHeadPlaceholder
-                dim_inner=512,
+                dim_inner=256,
                 batchnorm=True,
                 act='relu', # Stringa, verrà convertita in funzione nn.ReLU
                 dropout=0.15,
