@@ -293,6 +293,8 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             criterion_obj=None, criterion_type=args.criterion, is_validation=False
         )
 
+        save_predictions(test_predictions, args.test_path) # Assicurati che save_predictions accetti il path
+        logging.info(f"Predictions saved to /submissions")
 
     logging.info("Main script finished <<<")
     return full_train_dataset, train_loader, val_loader
