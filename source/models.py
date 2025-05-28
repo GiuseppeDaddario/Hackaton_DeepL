@@ -60,7 +60,7 @@ class TransformerConvBlock(torch.nn.Module):
         return x
 
 class GNN_node(torch.nn.Module):
-    def __init__(self, num_layer, emb_dim, drop_ratio=0.5, JK="last", residual=True, gnn_type='gin', num_edge_features=7, transformer_heads=4):
+    def __init__(self, num_layer, emb_dim, drop_ratio=0.5, JK="last", residual=True, gnn_type='transformer', num_edge_features=7, transformer_heads=4):
         super(GNN_node, self).__init__()
         self.num_layer = num_layer
         self.drop_ratio = drop_ratio
@@ -78,7 +78,7 @@ class GNN_node(torch.nn.Module):
         self.layer_norms = torch.nn.ModuleList() # Rinominato per chiarezza
 
         for layer in range(num_layer):
-            if self.gnn_type == 'gin':
+            if self.gnn_type == 'transformer':
                 self.convs.append(TransformerConvBlock(emb_dim, num_heads=transformer_heads, dropout_ratio=drop_ratio))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
@@ -97,7 +97,7 @@ class GNN_node(torch.nn.Module):
         for layer in range(self.num_layer):
             h_prev_layer = h_list[layer]
 
-            if self.gnn_type == 'gin':
+            if self.gnn_type == 'transformer':
                 h = self.convs[layer](h_prev_layer, edge_index, edge_embedding)
             else:
                 h = h_prev_layer
@@ -128,7 +128,7 @@ class GNN_node(torch.nn.Module):
 
 class GNN(torch.nn.Module):
     def __init__(self, num_class, num_layer=5, emb_dim=300,
-                 gnn_type='gin', residual=True, drop_ratio=0.5, JK="last", graph_pooling="attention",
+                 gnn_type='transformer', residual=True, drop_ratio=0.5, JK="last", graph_pooling="attention",
                  num_edge_features=7, transformer_heads=4):
         super(GNN, self).__init__()
 
