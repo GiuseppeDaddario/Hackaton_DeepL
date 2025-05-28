@@ -57,15 +57,17 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         force=True
     )
     logging.getLogger().addHandler(logging.StreamHandler())
-    logging.info("Starting main script...")
-    logging.info(f"Arguments: {args}")
-    logging.info(f"Using device: {device}")
+    logging.info("\n" + "="*60)
+    logging.info(">>> Starting main script")
+    logging.info("="*60 + "\n")
+    logging.info(f"• Device     : {device}")
+    logging.info(f"• Input args : {args}\n")
 
     num_dataset_classes = 6
     num_edge_features_resolved = args.num_edge_features
 
     # --- Costruzione Modello ---
-    logging.info("Building the model...")
+    logging.info(">>> Building the model...")
     model = GNN(
         gnn_type=args.gnn_type,
         num_class=num_dataset_classes,
@@ -78,9 +80,15 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         transformer_heads=args.transformer_heads,
         residual=not args.no_residual
     ).to(device)
-    logging.info(f"Model architecture: {model}")
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logging.info(f"Total trainable parameters: {total_params:,}")
+    logging.info(f"• Model architecture      : {args.gnn_type}")
+    logging.info(f"• Number of layers        : {args.num_layer}")
+    logging.info(f"• Embedding dimension     : {args.emb_dim}")
+    logging.info(f"• Dropout                 : {args.drop_ratio}")
+    logging.info(f"• Pooling                 : {args.graph_pooling}")
+    logging.info(f"• Residual                : {not args.no_residual}")
+    logging.info(f"• Total parameters        : {total_params:,}\n")
+
 
     optimizer_model = torch.optim.AdamW(model.parameters(), lr=args.lr_model, weight_decay=args.weight_decay)
 
@@ -99,7 +107,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
     # --- Training ---
     if args.train_path:
-        logging.info("Preparing train and validation datasets...")
+        logging.info(">>> Preparing train and validation datasets...")
         if full_train_dataset is None:
             full_train_dataset = GraphDataset(args.train_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
 
@@ -120,9 +128,13 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         train_dataset_subset = torch.utils.data.Subset(full_train_dataset, train_indices)
         val_dataset_subset = torch.utils.data.Subset(full_train_dataset, val_indices)
 
-        logging.info(f"Full train set size: {len(full_train_dataset)}")
-        logging.info(f"Training subset size: {len(train_dataset_subset)}")
-        logging.info(f"Validation subset size: {len(val_dataset_subset)}")
+        logging.info("\n" + "-"*60)
+        logging.info(">> Dataset: split in training/validation")
+        logging.info("-"*60 + "\n")
+
+        logging.info(f"• Full dataset size       : {len(full_train_dataset)}")
+        logging.info(f"• Training set            : {len(train_dataset_subset)} campioni")
+        logging.info(f"• Validation set          : {len(val_dataset_subset)} campioni\n")
 
         if train_loader is None:
             train_loader = DataLoader(train_dataset_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=device.type == 'cuda')
@@ -131,11 +143,10 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
         full_train_loader_for_atrain = None
         if args.criterion == "gcod":
-            logging.info("Preparing current training subset loader for atrain calculation (used by GCOD)...")
+            logging.info(">>> Preparing current training subset loader for atrain calculation (used by GCOD)...")
             full_train_loader_for_atrain = DataLoader(train_dataset_subset, batch_size=args.batch_size, shuffle=False)
 
         # --- Inizializzazione Loss Function ---
-        logging.info(f"Initializing loss function: {args.criterion}")
         criterion_obj = None
         optimizer_loss_params = None
 
@@ -155,6 +166,17 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             if len(y_values_numpy_for_gcod) != len(full_train_dataset):
                 logging.warning(f"Mismatch in length for GCOD y_values ({len(y_values_numpy_for_gcod)}) and full_train_dataset ({len(full_train_dataset)}). This can be problematic.")
 
+            logging.info("\n" + "-"*60)
+            logging.info(">> Initializing Loss Function")
+            logging.info("-"*60 + "\n")
+
+            logging.info(f"• Loss function used    : GCODLoss")
+            logging.info(f"• Number of classes     : {num_dataset_classes}")
+            logging.info(f"• Embeddings size       : {args.emb_dim}")
+            logging.info(f"• Total train samples   : {len(full_train_dataset)}")
+            logging.info(f"• Total epochs          : {args.epochs}")
+            logging.info(f"• Device                : {device}\n")
+
             criterion_obj = gcodLoss(
                 sample_labels_numpy=y_values_numpy_for_gcod,
                 device=device,
@@ -167,17 +189,20 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         else:
             raise ValueError(f"Unsupported criterion: {args.criterion}")
 
+        logging.info(">>> Loss function initialized and moved to device\n")
+
         # --- Training Loop ---
         best_val_accuracy = 0.0
         epochs_no_improve = 0
         train_losses_history, train_accuracies_history = [], []
         val_losses_history, val_accuracies_history = [], []
         atrain_global = 0.0
-        logging.info("Starting training loop...")
+        logging.info(">>> Starting training loop...")
         start_time_train = time.time()
 
         for epoch in range(args.epochs):
             epoch_start_time = time.time()
+
 
             if args.criterion == "gcod" and full_train_loader_for_atrain is not None:
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
@@ -205,14 +230,14 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
             epoch_duration = time.time() - epoch_start_time
             atrain_log_str = f"{atrain_global:.4f}" if args.criterion == 'gcod' and full_train_loader_for_atrain is not None else 'N/A'
-            logging.info(
-                f"Epoch {epoch + 1}/{args.epochs} | Time: {epoch_duration:.2f}s | "
-                f"Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_acc:.2f}% | "
-                f"Val Loss: {avg_val_loss:.4f}, Val Acc: {avg_val_acc*100:.2f}% | "
-                f"Atrain: {atrain_log_str}"
-            )
 
-
+            logging.info(f"{epoch+1:<7} | "
+                         f"{avg_train_loss:<10.4f} | "
+                         f"{avg_train_acc*100:<14.2f} | "
+                         f"{avg_val_loss:<10.4f} | "
+                         f"{avg_val_acc*100:<12.2f} | "
+                         f"{epoch_duration:<10.2f} | "
+                         f"{atrain_log_str:<8}")
 
             if avg_val_acc > best_val_accuracy:
                 best_val_accuracy = avg_val_acc
@@ -225,7 +250,9 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
 
         total_training_time = time.time() - start_time_train
-        logging.info(f"Training finished. Total time: {total_training_time:.2f}s.")
+        logging.info("\n" + "="*60)
+        logging.info(f">>> Training completed in {total_training_time:.2f} seconds")
+        logging.info("="*60 + "\n")
         plot_training_progress({"train_loss": train_losses_history, "val_loss": val_losses_history},
                                {"train_acc": train_accuracies_history, "val_acc": val_accuracies_history},
                                os.path.join(logs_folder, "training_plots"))
@@ -241,7 +268,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             logging.error(f"No model checkpoint found at {checkpoint_to_load_path}.")
             return
 
-        logging.info(f"Loading model from {checkpoint_to_load_path} for prediction.")
+        logging.info(f">>> Loading model from {checkpoint_to_load_path} for prediction.")
         loaded_data = torch.load(checkpoint_to_load_path, map_location=device)
 
         if isinstance(loaded_data, dict) and 'model_state_dict' in loaded_data:
@@ -249,21 +276,21 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         else:
             model.load_state_dict(loaded_data)
 
-        logging.info("Preparing test dataset...")
+        logging.info(">>> Preparing test dataset...")
         test_dataset = GraphDataset(args.test_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
         test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
-        logging.info("Generating predictions for the test set...")
+        logging.info(">>> Generating predictions for the test set...")
         test_predictions = evaluate_model(
             model=model, loader=test_loader, device=device,
             criterion_obj=None, criterion_type=args.criterion, is_validation=False
         )
 
         output_prediction_path = os.path.join(logs_folder, f"predictions_{test_dir_name}.txt")
-        save_predictions(test_predictions, output_prediction_path) # Assicurati che save_predictions accetti il path
-        logging.info(f"Predictions saved to {output_prediction_path}")
+        save_predictions(test_predictions, output_prediction_path)
+        logging.info(f">>> Predictions saved to {output_prediction_path}")
 
-    logging.info("Main script finished.")
+    logging.info("Main script finished <<<")
     return full_train_dataset, train_loader, val_loader
 
 
