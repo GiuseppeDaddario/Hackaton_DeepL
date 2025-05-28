@@ -40,8 +40,9 @@ def evaluate_model(
             if is_validation:
                 if not hasattr(data_batch, 'y'):
                     raise ValueError("Per la validazione (is_validation=True), 'data_batch.y' (etichette vere) deve essere presente.")
-                all_labels.extend(true_labels_int.cpu().numpy())
+
                 true_labels_int = data_batch.y.to(device)
+                all_labels.extend(true_labels_int.cpu().numpy())
 
                 if criterion_obj is None:
                     raise ValueError("Per la validazione (is_validation=True), 'criterion_obj' deve essere fornito.")
