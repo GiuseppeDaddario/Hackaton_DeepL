@@ -195,8 +195,9 @@ class CustomGNN(torch.nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        self.encoder = FeatureEncoder(dim_node_feat_raw)
-        dim_in = self.encoder.dim_in
+
+        dim_in = dim_node_feat_raw
+        self.input_proj = torch.nn.Linear(dim_in, cfg.gnn.dim_inner)
 
         if self.cfg.gnn.layers_pre_mp > 0:
             self.pre_mp = GNNPreMP(
@@ -223,8 +224,6 @@ class CustomGNN(torch.nn.Module):
         self.gnn_layers = torch.nn.Sequential(*layers)
 
 
-        from torch_geometric.graphgym.register import head_dict
-        print("HEADS REGISTRATE:", head_dict.keys())
         GNNHead = register.head_dict[self.cfg.gnn.head]
         self.post_mp = GNNHead(dim_in=self.cfg.gnn.dim_inner, dim_out=dim_out)
 
@@ -232,12 +231,6 @@ class CustomGNN(torch.nn.Module):
         return GatedGCNLayer
 
     def forward(self, batch):
-        batch = self.encoder(batch)
-        batch.x = self.input_proj(batch.x)
-
-        if hasattr(self, 'pre_mp'):
-            batch = self.pre_mp(batch)
-
-        batch = self.gnn_layers(batch)
-        batch = self.post_mp(batch)
+        for module in self.children():
+            batch = module(batch)
         return batch
