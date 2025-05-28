@@ -67,7 +67,8 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
     num_dataset_classes = 6
     num_edge_features_resolved = args.num_edge_features
-    num_node_features_resolved = args.num_node_features
+    sample_graph = GraphDataset(args.train_path, transform=add_zeros)[0]
+    num_node_features_resolved = sample_graph.edge_attr.size(1)
 
     # --- Costruzione Modello ---
     logging.info(">>> Building the model...")
