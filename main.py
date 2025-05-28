@@ -203,8 +203,10 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         criterion_obj = None
         optimizer_loss_params = None
 
-        if args.criterion == "ce":
+        if args.criterion == "ce_ls":
             criterion_obj = LabelSmoothingCrossEntropy(classes=num_dataset_classes, smoothing=args.label_smoothing).to(device)
+        elif args.criterion == "ce":
+            criterion_obj = torch.nn.CrossEntropyLoss().to(device)
         elif args.criterion == "gcod":
 
             if not hasattr(full_train_dataset, 'graphs_dicts_list'):
