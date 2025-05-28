@@ -228,6 +228,12 @@ class CustomGNN(torch.nn.Module):
         return GatedGCNLayer
 
     def forward(self, batch):
-        for module in self.children():
-            batch = module(batch)
+        batch = self.encoder(batch)
+        batch.x = self.input_proj(batch.x)
+
+        if hasattr(self, 'pre_mp'):
+            batch = self.pre_mp(batch)
+
+        batch = self.gnn_layers(batch)
+        batch = self.post_mp(batch)
         return batch
