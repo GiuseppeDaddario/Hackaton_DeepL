@@ -44,14 +44,16 @@ def save_predictions(predictions, test_path):
 #########################################
 ## GENERATE PLOTS OF TRAINING PROGRESS ##
 #########################################
+
+## LOSS, ACCURACY AND F1 SCORE PLOTTING
 def plot_training_progress(losses_dict, accuracies_dict, output_dir):
-    """
-    Genera e salva i plot dell'andamento di loss, accuracy e f1 durante il training.
-    Args:
-        losses_dict (dict): Es: {"train_loss": [...], "val_loss": [...]}
-        accuracies_dict (dict): Es: {"train_acc": [...], "val_acc": [...], "train_f1": [...], "val_f1": [...]}
-        output_dir (str): Cartella dove salvare i plot.
-    """
+    
+    ## losses_dict (dict) -->{"train_loss": [...], "val_loss": [...]}
+    ## accuracies_dict (dict) --> {"train_acc": [...], "val_acc": [...], "train_f1": [...], "val_f1": [...]}
+    ## output_dir (str) --> Path for saving plot.
+
+
+    # RETRIEVE THE NUMBER OF EPOCHS
     num_epochs = 0
     if "train_loss" in losses_dict and losses_dict["train_loss"]:
         num_epochs = len(losses_dict["train_loss"])
@@ -68,7 +70,7 @@ def plot_training_progress(losses_dict, accuracies_dict, output_dir):
 
     plt.figure(figsize=(18, 6))  # 3 subplot in 1 riga
 
-    # --- Plot Loss ---
+    # --- Plot LOSS ---
     plt.subplot(1, 3, 1)
     if "train_loss" in losses_dict:
         plt.plot(epochs_range, losses_dict["train_loss"], 'bo-', label="Training Loss", linewidth=2, markersize=5)
@@ -80,7 +82,7 @@ def plot_training_progress(losses_dict, accuracies_dict, output_dir):
     plt.legend()
     plt.grid(True)
 
-    # --- Plot Accuracy ---
+    # --- Plot ACCURACY ---
     plt.subplot(1, 3, 2)
     if "train_acc" in accuracies_dict:
         plt.plot(epochs_range, accuracies_dict["train_acc"], 'go-', label="Training Accuracy", linewidth=2, markersize=5)
@@ -92,7 +94,7 @@ def plot_training_progress(losses_dict, accuracies_dict, output_dir):
     plt.legend()
     plt.grid(True)
 
-    # --- Plot F1-score ---
+    # --- Plot F1-SCORE ---
     plt.subplot(1, 3, 3)
     if "train_f1" in accuracies_dict:
         plt.plot(epochs_range, accuracies_dict["train_f1"], 'c^-', label="Training F1-score", linewidth=2, markersize=5)
@@ -104,7 +106,7 @@ def plot_training_progress(losses_dict, accuracies_dict, output_dir):
     plt.legend()
     plt.grid(True)
 
-    # Salvataggio
+    # SAVING
     os.makedirs(output_dir, exist_ok=True)
     plot_path = os.path.join(output_dir, "training_validation_progress.png")
     try:

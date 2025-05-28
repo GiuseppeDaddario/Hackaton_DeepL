@@ -5,6 +5,8 @@ import torch.nn.functional as F
 
 
 
+
+## INFERENCE FUNCTION
 def evaluate_model(
         model,
         loader,
@@ -37,7 +39,7 @@ def evaluate_model(
 
 
 
-            # --- Logica specifica per la VALIDAZIONE (quando hai le etichette vere) ---
+            ## VALIDATION
             if is_validation:
                 if not hasattr(data_batch, 'y'):
                     raise ValueError("Per la validazione (is_validation=True), 'data_batch.y' (etichette vere) deve essere presente.")
@@ -49,12 +51,13 @@ def evaluate_model(
                 if criterion_obj is None:
                     raise ValueError("Per la validazione (is_validation=True), 'criterion_obj' deve essere fornito.")
 
-                # Calcolo della Loss
+                # LOSS RECALL
                 if criterion_type == "ce":
                     # criterion_obj qui è LabelSmoothingCrossEntropy o nn.CrossEntropyLoss
                     loss = criterion_obj(output_logits, true_labels_int)
+                
+                ## GCOD RECALL
                 elif criterion_type == "gcod":
-                    # gcodLoss richiede più input
                     if not hasattr(data_batch, 'original_idx'):
                         raise ValueError("Per GCOD in valutazione, 'original_idx' deve essere presente nel batch.")
                     if num_classes_dataset is None:
@@ -78,19 +81,27 @@ def evaluate_model(
 
                 total_loss += loss.item() * data_batch.num_graphs # Moltiplica per la dimensione del batch
                 all_predictions_list.extend(predicted_labels.cpu().numpy())
-            # --- Fine logica di validazione ---
+            # END OF VALIDATION
+            
+            
+            ## JUST PREDICTIONS (NO metrics)
             else:
                 # --- Logica specifica per il TEST (solo predizioni) ---
                 all_predictions_list.extend(predicted_labels.cpu().numpy()) #Append predictions of the batch
 
             total_samples += data_batch.num_graphs # Sum up the number of graphs labelled in the batch
 
+
+    ## RETURN METRICS
     if is_validation:
         avg_loss = total_loss / total_samples if total_samples > 0 else 0
         correct_predictions += (predicted_labels == true_labels_int).sum().item()
         accuracy = correct_predictions / total_samples if total_samples > 0 else 0
         f1 = f1_score(all_labels, all_predictions_list, average='macro')
         return avg_loss, accuracy, f1
+    
+    
+
+    ## RETURN PREDICTIONS
     else:
-        # Se non è validazione, si assume sia test e si restituiscono le predizioni
         return all_predictions_list

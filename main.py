@@ -15,7 +15,6 @@ import time
 from source.evaluation import evaluate_model
 from source.statistics import save_predictions, plot_training_progress
 from source.train import train_epoch
-from source.loadData import GraphDataset # La tua classe GraphDataset
 from source.loss import gcodLoss, LabelSmoothingCrossEntropy
 from source.models import GNN, CustomGNN
 from source.utils import set_seed
