@@ -178,9 +178,9 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             stratify=labels_for_split,
             random_state=args.seed
         )
-
-        train_dataset_subset = torch.utils.data.Subset(full_train_dataset, train_indices)
-        val_dataset_subset = torch.utils.data.Subset(full_train_dataset, val_indices)
+        if train_loader is None or val_loader is None:
+            train_dataset_subset = torch.utils.data.Subset(full_train_dataset, train_indices)
+            val_dataset_subset = torch.utils.data.Subset(full_train_dataset, val_indices)
 
         logging.info("\n" + "-"*60)
         logging.info(">> Dataset: split in training/validation")
