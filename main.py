@@ -98,7 +98,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
                 graph_pooling='mean'    # Usato in GNNHeadPlaceholder
             ),
             gnn=SimpleNamespace(
-                head='mlp',             # Usato per GNNHeadPlaceholder
+                head='mlp_graph',             # Usato per GNNHeadPlaceholder
                 layers_mp=4,
                 layer_type='gatedgcn',      # Usato per GatedGCNLayer
                 layers_pre_mp=0,
