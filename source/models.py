@@ -207,7 +207,7 @@ class CustomGNN(torch.nn.Module):
         else:
             self.input_proj = torch.nn.Identity()
 
-        print(f"cfg.gnn.dim_inner = {cfg.gnn.dim_inner}, encoder.dim_in = {dim_in}")
+        #print(f"cfg.gnn.dim_inner = {cfg.gnn.dim_inner}, encoder.dim_in = {dim_in}")
         assert self.cfg.gnn.dim_inner == dim_in, \
             "The inner and hidden dims must match."
 
