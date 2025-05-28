@@ -180,3 +180,5 @@ class GNN(torch.nn.Module):
         final_logits = self.graph_pred_linear(graph_emb)
 
         return final_logits, graph_emb, h_node
+    
+

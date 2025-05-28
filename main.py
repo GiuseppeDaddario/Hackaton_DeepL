@@ -294,8 +294,8 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
     return full_train_dataset, train_loader, val_loader
 
 
-TEST_PATH = "../datasets/B/test.json.gz"  # Replace with actual test dataset path
-TRAIN_PATH = "../datasets/B/train.json.gz"   # Optional, replace with actual train dataset path
+TEST_PATH = "../datasets/C/test.json.gz"  # Replace with actual test dataset path
+TRAIN_PATH = "../datasets/C/train.json.gz"   # Optional, replace with actual train dataset path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
@@ -308,9 +308,9 @@ if __name__ == "__main__":
     # Model Architecture
     parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
     parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN message passing layers (default: 3)')
-    parser.add_argument('--emb_dim', type=int, default=147, help='Dimensionality of hidden units in GNNs (default: 128)')
+    parser.add_argument('--emb_dim', type=int, default=204, help='Dimensionality of hidden units in GNNs (default: 128)')
     parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio (default: 0.1)')
-    parser.add_argument('--transformer_heads', type=int, default=3, help='Number of attention heads for TransformerConv (default: 4)')
+    parser.add_argument('--transformer_heads', type=int, default=4, help='Number of attention heads for TransformerConv (default: 4)')
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (default: 7, VERIFY FROM DATASET)')
     parser.add_argument('--jk_mode', type=str, default="last", choices=["last", "sum", "mean", "concat"], help="Jumping Knowledge mode (default: last)")
     parser.add_argument('--graph_pooling', type=str, default="attention", choices=["sum", "mean", "max", "attention", "set2set"], help="Graph pooling method (default: mean)")
