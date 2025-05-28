@@ -75,7 +75,7 @@ def evaluate_model(
                     raise ValueError(f"Unsupported criterion_type: {criterion_type} in evaluation.")
 
                 total_loss += loss.item() * data_batch.num_graphs # Moltiplica per la dimensione del batch
-                correct_predictions += (predicted_labels == true_labels_int).sum().item()
+                all_predictions_list.extend(predicted_labels.cpu().numpy())
             # --- Fine logica di validazione ---
             else:
                 # --- Logica specifica per il TEST (solo predizioni) ---
