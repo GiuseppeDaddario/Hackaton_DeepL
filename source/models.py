@@ -11,7 +11,7 @@ from torch_geometric.nn import TransformerConv, \
     global_mean_pool, Linear
 
 
-from source.conv import GatedGCNLayer
+
 
 
 # Nuovo Blocco Transformer Convoluzionale

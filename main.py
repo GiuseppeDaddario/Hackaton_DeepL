@@ -19,6 +19,7 @@ from source.loadData import GraphDataset # La tua classe GraphDataset
 from source.loss import gcodLoss, LabelSmoothingCrossEntropy
 from source.models import GNN, CustomGNN
 from source.utils import set_seed
+from source.dataLoader import GraphDataset
 
 set_seed()
 
