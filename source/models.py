@@ -188,6 +188,7 @@ class GNN(torch.nn.Module):
         final_logits = self.graph_pred_linear(graph_emb)
 
         return final_logits, graph_emb, h_node
+
 @register_network('custom_gnn')
 class CustomGNN(torch.nn.Module):
     def __init__(self, dim_node_feat_raw, dim_out, cfg):

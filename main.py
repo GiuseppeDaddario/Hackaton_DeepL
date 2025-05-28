@@ -31,6 +31,7 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
     with torch.no_grad():
         for data_batch in tqdm(full_train_loader, desc="Calculating global train accuracy (atrain)", unit="batch", leave=False, disable=True):
             graphs = data_batch.to(device)
+            print("graphs.x shape:", graphs.x.shape)
             labels_int = graphs.y.to(device)
             outputs_logits, _, _ = model(graphs)
             _, predicted = torch.max(outputs_logits.data, 1)
