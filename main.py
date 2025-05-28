@@ -159,10 +159,12 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
     # --- Training ---
     if args.train_path:
-        logging.info(">>> Preparing train and validation datasets...")
-        if full_train_dataset is None:
-            full_train_dataset = GraphDataset(args.train_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
 
+        if full_train_dataset is None:
+            logging.info(">>> Preparing train and validation datasets...")
+            full_train_dataset = GraphDataset(args.train_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
+        else:
+            logging.info(">>> Using train and validation datasets in kaggle...")
         try:
             labels_for_split = [data.y.item() for data in full_train_dataset if data.y is not None]
         except Exception as e:
