@@ -115,7 +115,6 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         )
         model = CustomGNN(
             dim_node_feat_raw=num_node_features_resolved,
-            dim_edge_feat_raw=num_edge_features_resolved,
             dim_out=num_dataset_classes,
             cfg=cfg_custom
         ).to(device)

@@ -3,7 +3,6 @@ from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_poo
 import torch
 import torch_geometric.graphgym.models.head  # noqa, register module
 import torch_geometric.graphgym.register as register
-from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.models.gnn import FeatureEncoder, GNNPreMP
 from torch_geometric.graphgym.register import register_network
 
@@ -75,30 +74,35 @@ class CustomGNN(torch.nn.Module):
     to support specific handling of new conv layers.
     """
 
-    def __init__(self, dim_in, dim_out):
+@register_network('custom_gnn')
+class CustomGNN(torch.nn.Module):
+    def __init__(self, dim_node_feat_raw, dim_out, cfg):
         super().__init__()
-        self.encoder = FeatureEncoder(dim_in)
+        self.cfg = cfg
+
+        self.encoder = FeatureEncoder(dim_node_feat_raw)
         dim_in = self.encoder.dim_in
 
-        if cfg.gnn.layers_pre_mp > 0:
+        if self.cfg.gnn.layers_pre_mp > 0:
             self.pre_mp = GNNPreMP(
-                dim_in, cfg.gnn.dim_inner, cfg.gnn.layers_pre_mp)
-            dim_in = cfg.gnn.dim_inner
+                dim_in, self.cfg.gnn.dim_inner, self.cfg.gnn.layers_pre_mp)
+            dim_in = self.cfg.gnn.dim_inner
 
-        assert cfg.gnn.dim_inner == dim_in, \
+        assert self.cfg.gnn.dim_inner == dim_in, \
             "The inner and hidden dims must match."
 
-        conv_model = self.build_conv_model(cfg.gnn.layer_type)
+        conv_model = self.build_conv_model(self.cfg.gnn.layer_type)
         layers = []
-        for _ in range(cfg.gnn.layers_mp):
+        for _ in range(self.cfg.gnn.layers_mp):
             layers.append(conv_model(dim_in,
                                      dim_in,
-                                     dropout=cfg.gnn.dropout,
-                                     residual=cfg.gnn.residual,ffn=cfg.gnn.ffn))
+                                     dropout=self.cfg.gnn.dropout,
+                                     residual=self.cfg.gnn.residual,
+                                     ffn=self.cfg.gnn.ffn))
         self.gnn_layers = torch.nn.Sequential(*layers)
 
-        GNNHead = register.head_dict[cfg.gnn.head]
-        self.post_mp = GNNHead(dim_in=cfg.gnn.dim_inner, dim_out=dim_out)
+        GNNHead = register.head_dict[self.cfg.gnn.head]
+        self.post_mp = GNNHead(dim_in=self.cfg.gnn.dim_inner, dim_out=dim_out)
 
     def build_conv_model(self, model_type):
         return GatedGCNLayer
