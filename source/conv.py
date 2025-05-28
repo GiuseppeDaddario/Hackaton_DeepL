@@ -239,7 +239,7 @@ class GNN_node_Virtualnode(torch.nn.Module):
         return node_representation
 
 class GatedGCNLayer(pyg_nn.conv.MessagePassing):
-    from torch_scatter import scatter
+   # from torch_scatter import scatter
     """
         GatedGCN layer
         Residual Gated Graph ConvNets
