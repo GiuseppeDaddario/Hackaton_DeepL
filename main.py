@@ -192,18 +192,23 @@ def main(args):
     predictions = evaluate(test_loader, model, device, calculate_accuracy=False)
     save_predictions(predictions, args.test_path)
 
+
+TRAIN_PATH = r"C:\Users\loreb\Desktop\Deep Learning\datasets\A\train.json.gz"
+TEST_PATH = r"C:\Users\loreb\Desktop\Deep Learning\datasets\A\test.json.gz"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
-    parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+    parser.add_argument("--train_path", type=str, default = TRAIN_PATH,help="Path to the training dataset (optional).")
+    parser.add_argument("--test_path", type=str, default = TEST_PATH, help="Path to the test dataset.")
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
-    parser.add_argument('--device', type=int, default=1, help='which gpu to use if any (default: 0)')
+    parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
     parser.add_argument('--gnn', type=str, default='gin', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')
     parser.add_argument('--drop_ratio', type=float, default=0.5, help='dropout ratio (default: 0.5)')
     parser.add_argument('--num_layer', type=int, default=5, help='number of GNN message passing layers (default: 5)')
     parser.add_argument('--emb_dim', type=int, default=300, help='dimensionality of hidden units in GNNs (default: 300)')
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
-    parser.add_argument('--epochs', type=int, default=10, help='number of epochs to train (default: 10)')
+    parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 10)')
     
     args = parser.parse_args()
     main(args)
