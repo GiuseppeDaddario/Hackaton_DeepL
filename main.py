@@ -298,8 +298,8 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
     return full_train_dataset, train_loader, val_loader
 
 
-TEST_PATH = "../datasets/C/test.json.gz"  # Replace with actual test dataset path
-TRAIN_PATH = "../datasets/C/train.json.gz"   # Optional, replace with actual train dataset path
+TEST_PATH = "../datasets/B/test.json.gz"  # Replace with actual test dataset path
+TRAIN_PATH = "../datasets/B/train.json.gz"   # Optional, replace with actual train dataset path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
@@ -321,7 +321,7 @@ if __name__ == "__main__":
     parser.add_argument('--no_residual', action='store_true', help='Disable residual connections in GNN layers.')
 
     # Training Hyperparameters
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
+    parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train (default: 100)')
     parser.add_argument('--batch_size', type=int, default=32, help='Input batch size for training (default: 32)')
     parser.add_argument('--lr_model', type=float, default=1e-3, help='Learning rate for the GNN model (default: 0.001)')
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty) for AdamW (default: 1e-5)')

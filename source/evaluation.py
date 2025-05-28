@@ -33,7 +33,7 @@ def evaluate_model(
             # Inference on the dataset
             output_logits, graph_embeddings, _ = model(data_batch) # (N, C), (N, emb_dim)
             _, predicted_labels = torch.max(output_logits, 1) # (N,) # takes the max probable label.
-            correct_predictions += (predicted_labels == true_labels_int).sum().item()
+            
 
 
 
@@ -44,7 +44,8 @@ def evaluate_model(
 
                 true_labels_int = data_batch.y.to(device)
                 all_labels.extend(true_labels_int.cpu().numpy())
-
+                correct_predictions += (predicted_labels == true_labels_int).sum().item()
+                
                 if criterion_obj is None:
                     raise ValueError("Per la validazione (is_validation=True), 'criterion_obj' deve essere fornito.")
 
