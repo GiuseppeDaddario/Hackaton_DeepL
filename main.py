@@ -1,6 +1,8 @@
 import argparse
 import logging
 import os
+from types import SimpleNamespace
+
 import torch
 import torch.optim as optim
 from torch_geometric.loader import DataLoader
@@ -16,7 +18,7 @@ from source.train import train_epoch
 from source.dataLoader import add_zeros # Utilizzato da GraphDataset
 from source.loadData import GraphDataset # La tua classe GraphDataset
 from source.loss import gcodLoss, LabelSmoothingCrossEntropy
-from source.models import GNN
+from source.models import GNN, CustomGNN
 from source.utils import set_seed
 
 set_seed()
@@ -65,21 +67,71 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
     num_dataset_classes = 6
     num_edge_features_resolved = args.num_edge_features
+    num_node_features_resolved = args.num_node_features
 
     # --- Costruzione Modello ---
     logging.info(">>> Building the model...")
-    model = GNN(
-        gnn_type=args.gnn_type,
-        num_class=num_dataset_classes,
-        num_layer=args.num_layer,
-        emb_dim=args.emb_dim,
-        drop_ratio=args.drop_ratio,
-        JK=args.jk_mode,
-        graph_pooling=args.graph_pooling,
-        num_edge_features=num_edge_features_resolved,
-        transformer_heads=args.transformer_heads,
-        residual=not args.no_residual
-    ).to(device)
+    if args.gnn_type == "transformer":
+        model = GNN(
+            gnn_type=args.gnn_type,
+            num_class=num_dataset_classes,
+            num_layer=args.num_layer,
+            emb_dim=args.emb_dim,
+            drop_ratio=args.drop_ratio,
+            JK=args.jk_mode,
+            graph_pooling=args.graph_pooling,
+            num_edge_features=num_edge_features_resolved,
+            transformer_heads=args.transformer_heads,
+            residual=not args.no_residual
+        ).to(device)
+    elif args.gnn_type == "gatedgcn":
+        cfg_custom = SimpleNamespace(
+            dataset=SimpleNamespace(
+                node_encoder_bn=False, # Valore di default se non specificato diversamente
+                edge_encoder_bn=False  # Valore di default
+            ),
+            model=SimpleNamespace(
+                type='custom_gnn',
+                loss_fun='cross_entropy', # Questo influenzerà la scelta di args.criterion
+                edge_decoding='dot',    # Non usato direttamente in CustomGNN forward
+                graph_pooling='mean'    # Usato in GNNHeadPlaceholder
+            ),
+            gnn=SimpleNamespace(
+                head='default',             # Usato per GNNHeadPlaceholder
+                layers_mp=4,
+                layer_type='gatedgcn',      # Usato per GatedGCNLayer
+                layers_pre_mp=0,
+                layers_post_mp=2,           # Usato in GNNHeadPlaceholder
+                dim_inner=512,
+                batchnorm=True,
+                act='relu', # Stringa, verrà convertita in funzione nn.ReLU
+                dropout=0.15,
+                agg='mean',                 # Non usato direttamente da GatedGCNLayer, l'aggregazione è implicita
+                normalize_adj=False,        # Non usato da GatedGCNLayer
+                ffn=False,                  # Passato a GatedGCNLayer
+                residual=True
+            )
+        )
+        model = CustomGNN(
+            dim_node_feat_raw=num_node_features_resolved,
+            dim_edge_feat_raw=num_edge_features_resolved,
+            dim_out=num_dataset_classes,
+            cfg=cfg_custom
+        ).to(device)
+        logging.info(f"• Model architecture      : {args.gnn_type} (CustomGNN with GatedGCNLayer)")
+        logging.info(f"• Layers Pre-MP           : {cfg_custom.gnn.layers_pre_mp}")
+        logging.info(f"• Layers MP (GatedGCN)    : {cfg_custom.gnn.layers_mp}")
+        logging.info(f"• Layers Post-MP (Head)   : {cfg_custom.gnn.layers_post_mp}")
+        logging.info(f"• Inner dimension         : {cfg_custom.gnn.dim_inner}")
+        logging.info(f"• Node features (raw)   : {num_node_features_resolved}")
+        logging.info(f"• Edge features (raw)   : {num_edge_features_resolved}")
+        logging.info(f"• Dropout                 : {cfg_custom.gnn.dropout}")
+        logging.info(f"• Graph Pooling (Head)    : {cfg_custom.model.graph_pooling}")
+        logging.info(f"• Batchnorm               : {cfg_custom.gnn.batchnorm}")
+        logging.info(f"• Residual                : {cfg_custom.gnn.residual}")
+        logging.info(f"• Activation              : {cfg_custom.gnn.act}")
+
+
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logging.info(f"• Model architecture      : {args.gnn_type}")
     logging.info(f"• Number of layers        : {args.num_layer}")
