@@ -1,4 +1,5 @@
 import torch
+from sklearn.metrics import f1_score
 from tqdm import tqdm
 import torch.nn.functional as F
 
@@ -19,12 +20,8 @@ def evaluate_model(
     total_loss = 0.0
     correct_predictions = 0
     total_samples = 0
-    all_predictions_list = [] # Per il test set finale
-
-    # Per la barra di progresso, mostrala sempre a meno che specificamente disabilitata
-    # Se is_validation è False, probabilmente è test, e vuoi vedere il progresso.
-    # Potresti voler passare un flag esplicito per `disable_tqdm` se necessario.
-    # Per ora, usiamo la logica originale: disable=not is_validation
+    all_predictions_list = []
+    all_labels = []
     desc_str = "Validating" if is_validation else "Testing (Predicting)"
 
     with torch.no_grad(): # Disabilita il calcolo dei gradienti
@@ -39,7 +36,8 @@ def evaluate_model(
             if is_validation:
                 if not hasattr(data_batch, 'y'):
                     raise ValueError("Per la validazione (is_validation=True), 'data_batch.y' (etichette vere) deve essere presente.")
-                true_labels_int = data_batch.y.to(device) # (N,)
+                all_labels.extend(true_labels_int.cpu().numpy())
+                true_labels_int = data_batch.y.to(device)
 
                 if criterion_obj is None:
                     raise ValueError("Per la validazione (is_validation=True), 'criterion_obj' deve essere fornito.")
@@ -82,8 +80,8 @@ def evaluate_model(
 
     if is_validation:
         avg_loss = total_loss / total_samples if total_samples > 0 else 0
-        accuracy = correct_predictions / total_samples if total_samples > 0 else 0
-        return avg_loss, accuracy
+        f1 = f1_score(all_labels, all_predictions_list, average='macro')
+        return avg_loss, f1
     else:
         # Se non è validazione, si assume sia test e si restituiscono le predizioni
         return all_predictions_list

@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from sklearn.metrics import f1_score
 from tqdm import tqdm
 import numpy as np
 
@@ -31,6 +32,8 @@ def train_epoch(
     running_epoch_loss_display = 0.0
     correct_samples_in_epoch = 0
     total_samples_in_epoch = 0
+    all_preds = []
+    all_labels = []
 
     effective_criterion_type = criterion_type
     if criterion_type == "gcod" and current_epoch < epoch_boost:
@@ -117,13 +120,15 @@ def train_epoch(
             _, predicted_labels = torch.max(output_logits, 1)
             total_samples_in_epoch += data_batch.num_graphs
             correct_samples_in_epoch += (predicted_labels == true_labels_int).sum().item()
+            all_preds.extend(predicted_labels.cpu().numpy())
+            all_labels.extend(true_labels_int.cpu().numpy())
 
     avg_epoch_loss = running_epoch_loss_display / total_samples_in_epoch if total_samples_in_epoch > 0 else 0.0
-    avg_epoch_accuracy = (correct_samples_in_epoch / total_samples_in_epoch) * 100 if total_samples_in_epoch > 0 else 0.0
+    f1 = f1_score(all_labels, all_preds, average='macro') if total_samples_in_epoch > 0 else 0.0
 
     if save_checkpoints:
         final_checkpoint_path = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
         torch.save(model.state_dict(), final_checkpoint_path)
         print(f"Checkpoint saved at {final_checkpoint_path}")
 
-    return avg_epoch_loss, avg_epoch_accuracy
+    return avg_epoch_loss, f1

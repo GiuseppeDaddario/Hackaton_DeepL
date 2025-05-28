@@ -192,10 +192,10 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         logging.info(">>> Loss function initialized and moved to device\n")
 
         # --- Training Loop ---
-        best_val_accuracy = 0.0
+        best_val_f1 = 0.0
         epochs_no_improve = 0
-        train_losses_history, train_accuracies_history = [], []
-        val_losses_history, val_accuracies_history = [], []
+        train_losses_history, train_f1_history = [], []
+        val_losses_history, val_f1_history = [], []
         atrain_global = 0.0
         logging.info(">>> Starting training loop...")
         start_time_train = time.time()
@@ -207,7 +207,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             if args.criterion == "gcod" and full_train_loader_for_atrain is not None:
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
-            avg_train_loss, avg_train_acc = train_epoch(
+            avg_train_loss, train_f1 = train_epoch(
                 model=model, loader=train_loader, optimizer_model=optimizer_model, device=device,
                 criterion_obj=criterion_obj, criterion_type=args.criterion,
                 optimizer_loss_params=optimizer_loss_params, num_classes_dataset=num_dataset_classes,
@@ -217,36 +217,36 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
                 gradient_clipping_norm=args.gradient_clipping
             )
             train_losses_history.append(avg_train_loss)
-            train_accuracies_history.append(avg_train_acc)
+            train_f1_history.append(train_f1)
 
-            avg_val_loss, avg_val_acc = evaluate_model(
+            avg_val_loss, val_f1 = evaluate_model(
                 model=model, loader=val_loader, device=device, criterion_obj=criterion_obj,
                 criterion_type=args.criterion if not (args.criterion == "gcod" and epoch < args.epoch_boost) else "ce",
                 num_classes_dataset=num_dataset_classes, lambda_l3_weight=args.lambda_l3_weight,
                 current_epoch_for_gcod=epoch, atrain_for_gcod=atrain_global, is_validation=True
             )
             val_losses_history.append(avg_val_loss)
-            val_accuracies_history.append(avg_val_acc * 100)
+            val_f1_history.append(val_f1 * 100)
 
             epoch_duration = time.time() - epoch_start_time
             atrain_log_str = f"{atrain_global:.4f}" if args.criterion == 'gcod' and full_train_loader_for_atrain is not None else 'N/A'
 
             logging.info(f"{epoch+1:<7} | "
                          f"{avg_train_loss:<10.4f} | "
-                         f"{avg_train_acc*100:<14.2f} | "
+                         f"{train_f1*100:<14.2f} | "
                          f"{avg_val_loss:<10.4f} | "
-                         f"{avg_val_acc*100:<12.2f} | "
+                         f"{val_f1*100:<12.2f} | "
                          f"{epoch_duration:<10.2f} | "
                          f"{atrain_log_str:<8}")
 
-            if avg_val_acc > best_val_accuracy:
-                best_val_accuracy = avg_val_acc
+            if val_f1 > best_val_f1:
+                best_val_f1 = val_f1
                 torch.save(model.state_dict(), checkpoint_path_best)
-                logging.info(f"Best validation model updated: {checkpoints_folder_epochs} (Val Acc: {best_val_accuracy*100:.2f}%)")
+                logging.info(f"Best validation model updated: {checkpoints_folder_epochs} (Val F1: {best_val_f1*100:.2f}%)")
                 epochs_no_improve = 0
             else:
                 epochs_no_improve += 1
-                logging.info(f"No improvement for {epochs_no_improve} epoch(s). Best Val Acc: {best_val_accuracy*100:.2f}%")
+                logging.info(f"No improvement for {epochs_no_improve} epoch(s). Best Val F1: {best_val_f1*100:.2f}%")
 
 
         total_training_time = time.time() - start_time_train
@@ -254,7 +254,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         logging.info(f">>> Training completed in {total_training_time:.2f} seconds")
         logging.info("="*60 + "\n")
         plot_training_progress({"train_loss": train_losses_history, "val_loss": val_losses_history},
-                               {"train_acc": train_accuracies_history, "val_acc": val_accuracies_history},
+                               {"train_acc": train_f1_history, "val_acc": val_f1_history},
                                os.path.join(logs_folder, "training_plots"))
 
     # --- Predizione sul Test Set ---
