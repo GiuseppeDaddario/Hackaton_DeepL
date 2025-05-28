@@ -85,8 +85,9 @@ def evaluate_model(
 
     if is_validation:
         avg_loss = total_loss / total_samples if total_samples > 0 else 0
+        accuracy = correct_predictions / total_samples if total_samples > 0 else 0
         f1 = f1_score(all_labels, all_predictions_list, average='macro')
-        return avg_loss, f1
+        return avg_loss, accuracy, f1
     else:
         # Se non è validazione, si assume sia test e si restituiscono le predizioni
         return all_predictions_list

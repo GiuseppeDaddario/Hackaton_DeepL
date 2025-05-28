@@ -194,8 +194,8 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         # --- Training Loop ---
         best_val_f1 = 0.0
         epochs_no_improve = 0
-        train_losses_history, train_f1_history = [], []
-        val_losses_history, val_f1_history = [], []
+        train_losses_history, train_f1_history, train_accuracy_history = [], [], []
+        val_losses_history, val_f1_history, val_accuracy_history = [], [], []
         atrain_global = 0.0
         logging.info(">>> Starting training loop...")
         start_time_train = time.time()
@@ -207,7 +207,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             if args.criterion == "gcod" and full_train_loader_for_atrain is not None:
                 atrain_global = calculate_global_train_accuracy(model, full_train_loader_for_atrain, device)
 
-            avg_train_loss, train_f1 = train_epoch(
+            avg_train_loss, avg_train_accuracy, train_f1 = train_epoch(
                 model=model, loader=train_loader, optimizer_model=optimizer_model, device=device,
                 criterion_obj=criterion_obj, criterion_type=args.criterion,
                 optimizer_loss_params=optimizer_loss_params, num_classes_dataset=num_dataset_classes,
@@ -218,8 +218,9 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             )
             train_losses_history.append(avg_train_loss)
             train_f1_history.append(train_f1)
+            train_accuracy_history.append(avg_train_accuracy)
 
-            avg_val_loss, val_f1 = evaluate_model(
+            avg_val_loss, val_acc, val_f1 = evaluate_model(
                 model=model, loader=val_loader, device=device, criterion_obj=criterion_obj,
                 criterion_type=args.criterion if not (args.criterion == "gcod" and epoch < args.epoch_boost) else "ce",
                 num_classes_dataset=num_dataset_classes, lambda_l3_weight=args.lambda_l3_weight,
@@ -227,17 +228,23 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             )
             val_losses_history.append(avg_val_loss)
             val_f1_history.append(val_f1 * 100)
+            val_accuracy_history.append(val_acc)
+
 
             epoch_duration = time.time() - epoch_start_time
             atrain_log_str = f"{atrain_global:.4f}" if args.criterion == 'gcod' and full_train_loader_for_atrain is not None else 'N/A'
 
-            logging.info(f"{epoch+1:<7} | "
-                         f"{avg_train_loss:<10.4f} | "
-                         f"{train_f1*100:<14.2f} | "
-                         f"{avg_val_loss:<10.4f} | "
-                         f"{val_f1*100:<12.2f} | "
-                         f"{epoch_duration:<10.2f} | "
-                         f"{atrain_log_str:<8}")
+            logging.info(
+                f"Epoch {epoch + 1} | "
+                f"Train Loss: {avg_train_loss:.4f} | "
+                f"Train F1: {train_f1 * 100:.2f}% | "
+                f"Train Acc: {avg_train_accuracy * 100:.2f}% | "
+                f"Val Loss: {avg_val_loss:.4f} | "
+                f"Val F1: {val_f1 * 100:.2f}% | "
+                f"Val Acc: {val_acc * 100:.2f}% | "
+                f"Time: {epoch_duration:.2f}s | "
+                f"a_train: {atrain_log_str}"
+            )
 
             if val_f1 > best_val_f1:
                 best_val_f1 = val_f1

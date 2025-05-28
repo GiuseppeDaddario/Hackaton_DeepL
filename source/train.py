@@ -125,12 +125,11 @@ def train_epoch(
 
     avg_epoch_loss = running_epoch_loss_display / total_samples_in_epoch if total_samples_in_epoch > 0 else 0.0
     f1 = f1_score(all_labels, all_preds, average='macro') if total_samples_in_epoch > 0 else 0.0
-
-    #avg_epoch_accuracy = (correct_samples_in_epoch / total_samples_in_epoch) if total_samples_in_epoch > 0 else 0.0
+    avg_epoch_accuracy = (correct_samples_in_epoch / total_samples_in_epoch) if total_samples_in_epoch > 0 else 0.0
 
     if save_checkpoints:
         final_checkpoint_path = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
         torch.save(model.state_dict(), final_checkpoint_path)
         print(f"Checkpoint saved at {final_checkpoint_path}")
 
-    return avg_epoch_loss, f1
+    return avg_epoch_loss, avg_epoch_accuracy, f1
