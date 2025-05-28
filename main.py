@@ -293,9 +293,6 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             criterion_obj=None, criterion_type=args.criterion, is_validation=False
         )
 
-        output_prediction_path = os.path.join(logs_folder, f"predictions_{test_dir_name}.txt")
-        save_predictions(test_predictions, output_prediction_path)
-        logging.info(f">>> Predictions saved to {output_prediction_path}")
 
     logging.info("Main script finished <<<")
     return full_train_dataset, train_loader, val_loader
