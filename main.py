@@ -15,7 +15,6 @@ import time
 from source.evaluation import evaluate_model
 from source.statistics import save_predictions, plot_training_progress
 from source.train import train_epoch
-from source.dataLoader import add_zeros # Utilizzato da GraphDataset
 from source.loadData import GraphDataset # La tua classe GraphDataset
 from source.loss import gcodLoss, LabelSmoothingCrossEntropy
 from source.models import GNN, CustomGNN
@@ -162,7 +161,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
 
         if full_train_dataset is None:
             logging.info(">>> Preparing train and validation datasets...")
-            full_train_dataset = GraphDataset(args.train_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
+            full_train_dataset = GraphDataset(args.train_path, transform=None) # Assumendo che add_zeros sia corretto
         else:
             logging.info(">>> Using train and validation datasets in kaggle...")
         try:
@@ -340,7 +339,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             model.load_state_dict(loaded_data)
 
         logging.info(">>> Preparing test dataset...")
-        test_dataset = GraphDataset(args.test_path, transform=add_zeros) # Assumendo che add_zeros sia corretto
+        test_dataset = GraphDataset(args.test_path, transform=None) # Assumendo che add_zeros sia corretto
         test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
         logging.info(">>> Generating predictions for the test set...")
