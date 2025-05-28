@@ -81,6 +81,7 @@ class CustomGNN(torch.nn.Module):
                 dim_in, self.cfg.gnn.dim_inner, self.cfg.gnn.layers_pre_mp)
             dim_in = self.cfg.gnn.dim_inner
 
+        print(f"cfg.gnn.dim_inner = {cfg.gnn.dim_inner}, encoder.dim_in = {dim_in}")
         assert self.cfg.gnn.dim_inner == dim_in, \
             "The inner and hidden dims must match."
 
