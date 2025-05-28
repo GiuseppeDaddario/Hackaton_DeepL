@@ -248,17 +248,24 @@ class CustomGNN(torch.nn.Module):
         return GatedGCNLayer
 
     def forward(self, batch):
-        # Proiezione input iniziale sulle feature dei nodi
-        batch.x = self.input_proj(batch.x)
+        batch = self.pre_mp(batch)
 
-    # >>> AGGIUNGI QUESTO <<<
+        if not isinstance(self.input_proj, nn.Identity):
+            batch.x = self.input_proj(batch.x)
+
         if hasattr(batch, 'edge_attr') and batch.edge_attr is not None:
-            batch.edge_attr = self.edge_input_proj(batch.edge_attr) # Proietta le feature degli archi
-            # ...
+            if not isinstance(self.edge_input_proj, nn.Identity):
+                batch.edge_attr = self.edge_input_proj(batch.edge_attr)
 
-        # Passa tutto il batch agli altri moduli (GNN, head, ecc.)
-        for module in self.children():
-            if module == self.input_proj:
-                continue  # Già applicato
-            batch = module(batch)
-        return batch
+        batch = self.gnn_layers(batch)
+        out_head = self.post_mp(batch)
+
+        if isinstance(out_head, tuple):
+            logits = out_head[0]
+            graph_emb = out_head[1] if len(out_head) > 1 else None
+        else:
+            logits = out_head
+            graph_emb = None
+
+
+        return logits, graph_emb, None
