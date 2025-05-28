@@ -85,6 +85,7 @@ def evaluate_model(
 
     if is_validation:
         avg_loss = total_loss / total_samples if total_samples > 0 else 0
+        correct_predictions += (predicted_labels == true_labels_int).sum().item()
         accuracy = correct_predictions / total_samples if total_samples > 0 else 0
         f1 = f1_score(all_labels, all_predictions_list, average='macro')
         return avg_loss, accuracy, f1
