@@ -262,26 +262,29 @@ def main(args):
     logging.info("Main script finished.")
 
 
+TEST_PATH = "../datasets/B/test.json.gz"  # Replace with actual test dataset path
+TRAIN_PATH = "../datasets/B/train.json.gz"   # Optional, replace with actual train dataset path
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
 
     # Dataset and Paths
-    parser.add_argument("--train_path", type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--test_path", type=str, required=True, help="Path to the test dataset.")
+    parser.add_argument("--train_path", type=str,default= TRAIN_PATH, help="Path to the training dataset (optional).")
+    parser.add_argument("--test_path", type=str, default = TEST_PATH, help="Path to the test dataset.")
 
     # Model Architecture
     parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
     parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN message passing layers (default: 3)')
-    parser.add_argument('--emb_dim', type=int, default=128, help='Dimensionality of hidden units in GNNs (default: 128)')
+    parser.add_argument('--emb_dim', type=int, default=147, help='Dimensionality of hidden units in GNNs (default: 128)')
     parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio (default: 0.1)')
-    parser.add_argument('--transformer_heads', type=int, default=4, help='Number of attention heads for TransformerConv (default: 4)')
+    parser.add_argument('--transformer_heads', type=int, default=3, help='Number of attention heads for TransformerConv (default: 4)')
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (default: 7, VERIFY FROM DATASET)')
     parser.add_argument('--jk_mode', type=str, default="last", choices=["last", "sum", "mean", "concat"], help="Jumping Knowledge mode (default: last)")
     parser.add_argument('--graph_pooling', type=str, default="attention", choices=["sum", "mean", "max", "attention", "set2set"], help="Graph pooling method (default: mean)")
     parser.add_argument('--no_residual', action='store_true', help='Disable residual connections in GNN layers.')
 
     # Training Hyperparameters
-    parser.add_argument('--epochs', type=int, default=70, help='Number of epochs to train (default: 100)')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
     parser.add_argument('--batch_size', type=int, default=32, help='Input batch size for training (default: 32)')
     parser.add_argument('--lr_model', type=float, default=1e-3, help='Learning rate for the GNN model (default: 0.001)')
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty) for AdamW (default: 1e-5)')
