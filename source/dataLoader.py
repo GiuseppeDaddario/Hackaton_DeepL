@@ -5,9 +5,6 @@
 import torch
 
 
-def load_data(file_path):
-
-    print("ok")
 
 def add_zeros(data):
     data.x = torch.zeros(data.num_nodes, dtype=torch.long)

@@ -16,10 +16,15 @@ def gzip_folder(args):
         tar.add(args.folder_path, arcname=os.path.basename(args.folder_path))
     print(f"Folder '{args.folder_path}' has been compressed into '{args.output_file}'")
 
+
+
+folder_path = r"C:\Users\Lorenzo\Desktop\submission"
+output_file = r"C:\Users\Lorenzo\Desktop\submission.gz"
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
-    parser.add_argument("--folder_path", required=True, type=str, help="Path to the training dataset (optional).")
-    parser.add_argument("--output_file",  required=True, type=str, help="Path to the training dataset (optional).")
+    parser.add_argument("--folder_path", default = folder_path, type=str, help="Path to the training dataset (optional).")
+    parser.add_argument("--output_file",  default = output_file, type=str, help="Path to the training dataset (optional).")
     args_ = parser.parse_args()
     gzip_folder(args_)
 
