@@ -221,6 +221,9 @@ class CustomGNN(torch.nn.Module):
                                      ffn=self.cfg.gnn.ffn))
         self.gnn_layers = torch.nn.Sequential(*layers)
 
+
+        from torch_geometric.graphgym.register import head_dict
+        print("HEADS REGISTRATE:", head_dict.keys())
         GNNHead = register.head_dict[self.cfg.gnn.head]
         self.post_mp = GNNHead(dim_in=self.cfg.gnn.dim_inner, dim_out=dim_out)
 
