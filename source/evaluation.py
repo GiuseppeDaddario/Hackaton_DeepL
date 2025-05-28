@@ -33,6 +33,7 @@ def evaluate_model(
             # Inference on the dataset
             output_logits, graph_embeddings, _ = model(data_batch) # (N, C), (N, emb_dim)
             _, predicted_labels = torch.max(output_logits, 1) # (N,) # takes the max probable label.
+            correct_predictions += (predicted_labels == true_labels_int).sum().item()
 
 
 
