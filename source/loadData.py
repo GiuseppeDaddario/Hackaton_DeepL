@@ -110,6 +110,16 @@ class GraphDataset(Dataset):
         # L'eventuale 'transform' di PyG (passato a __init__) viene applicato qui dal DataLoader
         return self.processed_data_list[idx]
 
+    
+    
+
+
+
+
+###############################
+    ###########################
+    ##PROBABILMENTE DA TOGLIERE
+    
     # Metodo per ottenere le etichette originali per GCOD, se il main.py lo richiede ancora
     # da graphs_dicts_list. Altrimenti, può essere rimosso se il main.py usa all_labels.
     def get_original_y_list_for_gcod(self):

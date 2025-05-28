@@ -3,6 +3,8 @@ from sklearn.metrics import f1_score
 from tqdm import tqdm
 import torch.nn.functional as F
 
+
+
 def evaluate_model(
         model,
         loader,
@@ -24,13 +26,15 @@ def evaluate_model(
     all_labels = []
     desc_str = "Validating" if is_validation else "Testing (Predicting)"
 
-    with torch.no_grad(): # Disabilita il calcolo dei gradienti
+    with torch.no_grad(): # Disable gradient computation for evaluation
         for batch_idx, data_batch in enumerate(tqdm(loader, desc=desc_str, unit="batch", leave=False, disable=not is_validation)):
             data_batch = data_batch.to(device)
 
-            # --- Calcolo comune a validazione e test ---
+            # Inference on the dataset
             output_logits, graph_embeddings, _ = model(data_batch) # (N, C), (N, emb_dim)
-            _, predicted_labels = torch.max(output_logits, 1) # (N,)
+            _, predicted_labels = torch.max(output_logits, 1) # (N,) # takes the max probable label.
+
+
 
             # --- Logica specifica per la VALIDAZIONE (quando hai le etichette vere) ---
             if is_validation:
@@ -74,9 +78,9 @@ def evaluate_model(
             # --- Fine logica di validazione ---
             else:
                 # --- Logica specifica per il TEST (solo predizioni) ---
-                all_predictions_list.extend(predicted_labels.cpu().numpy())
+                all_predictions_list.extend(predicted_labels.cpu().numpy()) #Append predictions of the batch
 
-            total_samples += data_batch.num_graphs
+            total_samples += data_batch.num_graphs # Sum up the number of graphs labelled in the batch
 
     if is_validation:
         avg_loss = total_loss / total_samples if total_samples > 0 else 0

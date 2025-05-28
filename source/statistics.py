@@ -3,6 +3,14 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+
+#########################################
+##             SAVING CSV              ##
+#########################################
+
+# predictions: lista di predizioni da salvare
+# test_path: percorso del file di test [VIENE SOVRASCRITTO!]
+
 def save_predictions(predictions, test_path):
     source_dir = os.path.dirname(os.path.abspath(__file__))
     script_dir = os.path.dirname(source_dir)
@@ -22,7 +30,20 @@ def save_predictions(predictions, test_path):
     output_df.to_csv(output_csv_path, index=False)
     print(f"Predictions saved to {output_csv_path}")
 
+#########################################
+##          END OF SAVING CSV          ##
+#########################################
 
+
+
+
+
+
+
+
+#########################################
+## GENERATE PLOTS OF TRAINING PROGRESS ##
+#########################################
 def plot_training_progress(losses_dict, accuracies_dict, output_dir):
     """
     Genera e salva i plot dell'andamento di loss e accuracy durante il training.
@@ -100,3 +121,7 @@ def plot_training_progress(losses_dict, accuracies_dict, output_dir):
         # logging.error(f"Failed to save plot to {plot_path}: {e}") # Se usi logging
         print(f"Error saving plot to {plot_path}: {e}")
         plt.close()
+
+#########################################
+##              END PLOT               ##
+#########################################
