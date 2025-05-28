@@ -9,7 +9,7 @@ from torch_geometric.loader import DataLoader
 from source.dataLoader import add_zeros
 ## Modular imports
 from source.evaluation import evaluate_model as evaluate
-from source.loadData import GraphDataset
+from source.dataLoader import GraphDataset
 from source.models import GNN
 from source.statistics import save_predictions
 from source.utils import set_seed
