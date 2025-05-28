@@ -67,7 +67,9 @@ class GraphDataset(Dataset):
             # Questo è cruciale per gcodLoss
             true_original_idx_tensor = torch.tensor([i], dtype=torch.long)
 
+            x = torch.zeros((num_nodes, 7), dtype=torch.float)  # 7 = numero di feature nodali atteso
             data_obj = Data(
+                x=x,
                 edge_index=edge_index,
                 edge_attr=edge_attr,
                 num_nodes=num_nodes,
