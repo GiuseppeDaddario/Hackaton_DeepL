@@ -100,6 +100,8 @@ class GNN_node(torch.nn.Module):
 
             if self.gnn_type == 'transformer':
                 h = self.convs[layer](h_prev_layer, edge_index, edge_embedding)
+            elif self.gnn_type == 'gine':
+                h = self.convs[layer](h_prev_layer, edge_index, edge_attr=edge_embedding)
             else:
                 h = h_prev_layer
 
