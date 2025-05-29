@@ -127,7 +127,7 @@ def train_epoch(
 
         # Calcolo accuracy del batch (opzionale, ma utile per monitoring)
         with torch.no_grad():
-            _, predicted_labels = torch.max(output_logits, 1)
+            _, predicted_labels = torch.max(actual_logits, 1)
             total_samples_in_epoch += data_batch.num_graphs
             correct_samples_in_epoch += (predicted_labels == true_labels_int).sum().item()
             all_preds.extend(predicted_labels.cpu().numpy())
