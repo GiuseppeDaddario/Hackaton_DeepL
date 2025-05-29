@@ -31,7 +31,7 @@ def evaluate_model(
             data_batch = data_batch.to(device)
 
             # Inference on the dataset
-            output_logits, graph_embeddings, _ = model(data_batch) # (N, C), (N, emb_dim)
+            output_logits= model(data_batch) # (N, C), (N, emb_dim)
             _, predicted_labels = torch.max(output_logits, 1) # (N,) # takes the max probable label.
             
 
