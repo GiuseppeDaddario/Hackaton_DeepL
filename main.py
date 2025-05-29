@@ -150,7 +150,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         criterion_obj = None
         optimizer_loss_params = None
 
-        if args.criterion == "ce":
+        if args.criterion == "ce" or (args.criterion == "gcod" and args.epoch_boost > 0):
             criterion_obj = LabelSmoothingCrossEntropy(classes=num_dataset_classes, smoothing=args.label_smoothing).to(device)
         elif args.criterion == "gcod":
 

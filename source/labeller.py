@@ -67,18 +67,18 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
 
-    parser.add_argument("--test_path", type=str, default="/Users/giuseppedaddario/Documents/Hackaton_DeepL/datasets/B/test.json.gz", help="Path to the test dataset.")
-    parser.add_argument("--checkpoint_path", type=str, default="/Users/giuseppedaddario/Downloads/model_best_val.pth", help="Path to the model checkpoint to load.")
+    parser.add_argument("--test_path", type=str, default="/Users/giuseppedaddario/Documents/Hackaton_DeepL/datasets/A/test.json.gz", help="Path to the test dataset.")
+    parser.add_argument("--checkpoint_path", type=str, default="/Users/giuseppedaddario/Downloads/model_A_best_80.pth", help="Path to the model checkpoint to load.")
 
     # Model Architecture
     parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
-    parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN message passing layers (default: 3)')
-    parser.add_argument('--emb_dim', type=int, default=147, help='Dimensionality of hidden units in GNNs (default: 128)')
+    parser.add_argument('--num_layer', type=int, default=1, help='Number of GNN message passing layers (default: 3)')
+    parser.add_argument('--emb_dim', type=int, default=64, help='Dimensionality of hidden units in GNNs (default: 128)')
     parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio (default: 0.1)')
-    parser.add_argument('--transformer_heads', type=int, default=3, help='Number of attention heads for TransformerConv (default: 4)')
+    parser.add_argument('--transformer_heads', type=int, default=1, help='Number of attention heads for TransformerConv (default: 4)')
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (default: 7, VERIFY FROM DATASET)')
     parser.add_argument('--jk_mode', type=str, default="last", choices=["last", "sum", "mean", "concat"], help="Jumping Knowledge mode (default: last)")
-    parser.add_argument('--graph_pooling', type=str, default="attention", choices=["sum", "mean", "max", "attention", "set2set"], help="Graph pooling method (default: mean)")
+    parser.add_argument('--graph_pooling', type=str, default="mean", choices=["sum", "mean", "max", "attention", "set2set"], help="Graph pooling method (default: mean)")
     parser.add_argument('--no_residual', action='store_true', help='Disable residual connections in GNN layers.')
 
     # Training Hyperparameters
@@ -93,14 +93,16 @@ if __name__ == "__main__":
     parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod"], help="Type of loss to use (default: ce)")
     parser.add_argument('--label_smoothing', type=float, default=0.1, help='Amount of label smoothing for CE loss (default: 0.1, use 0 for no smoothing)')
     parser.add_argument("--lr_u", type=float, default=0.01, help="Learning rate for 'u' parameters in GCOD (default: 0.01)")
-    parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss (default: 0.7)")
+    parser.add_argument("--lambda_l3_weight", type=float, default=1.0, help="Weight for L3 component in GCOD loss (default: 0.7)")
     parser.add_argument('--epoch_boost', type=int, default=0, help='Number of initial epochs with CE loss before GCOD (default: 0)')
 
     # Runtime and Misc
     parser.add_argument('--device', type=int, default=0, help='GPU device ID to use if available (default: 0, -1 for CPU)')
-    parser.add_argument('--seed', type=int, default=777, help='Random seed (default: 777)')
+    parser.add_argument('--seed', type=int, default=2177530, help='Random seed (default: 777)')
     parser.add_argument("--predict", type=int, default=1, choices=[0,1], help="Generate and save predictions on the test set (default: 1)")
     parser.add_argument('--num_workers', type=int, default=0, help='Number of Dataloader workers (default: 0 for main process, >0 for multiprocessing)')
 
     args = parser.parse_args()
     main(args)
+
+
