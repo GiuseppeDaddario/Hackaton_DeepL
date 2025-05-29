@@ -150,7 +150,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         criterion_obj = None
         optimizer_loss_params = None
 
-        if args.criterion == "ce" or (args.criterion == "gcod" and args.epoch_boost > 0):
+        if args.criterion == "ce":
             criterion_obj = LabelSmoothingCrossEntropy(classes=num_dataset_classes, smoothing=args.label_smoothing).to(device)
         elif args.criterion == "gcod":
 
@@ -186,6 +186,9 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
                 total_epochs=args.epochs
             ).to(device)
             optimizer_loss_params = optim.SGD(criterion_obj.parameters(), lr=args.lr_u)
+            if args.epoch_boost > 0:
+                criterion_obj_ce = LabelSmoothingCrossEntropy(classes=num_dataset_classes, smoothing=args.label_smoothing).to(device)
+
         else:
             raise ValueError(f"Unsupported criterion: {args.criterion}")
 
@@ -221,7 +224,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
             train_accuracy_history.append(avg_train_accuracy)
 
             avg_val_loss, val_acc, val_f1 = evaluate_model(
-                model=model, loader=val_loader, device=device, criterion_obj=criterion_obj,
+                model=model, loader=val_loader, device=device, criterion_obj=criterion_obj if not (args.criterion == "gcod" and epoch < args.epoch_boost) else criterion_obj_ce,
                 criterion_type=args.criterion if not (args.criterion == "gcod" and epoch < args.epoch_boost) else "ce",
                 num_classes_dataset=num_dataset_classes, lambda_l3_weight=args.lambda_l3_weight,
                 current_epoch_for_gcod=epoch, atrain_for_gcod=atrain_global, is_validation=True
