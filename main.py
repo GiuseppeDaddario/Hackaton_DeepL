@@ -10,6 +10,7 @@ import logging
 from tqdm import tqdm
 
 from src.models import GNN 
+from src.conv import GINETransformerNet
 
 # Set the random seed
 set_seed()
@@ -124,7 +125,10 @@ def main(args):
         model = GNN(gnn_type = 'gine', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
     
     elif args.gnn == 'gineTransformer':
-        model = GNN(gnn_type = 'gineTransformer', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, ff_dim = args.ff_dim, residual = args.residual, num_heads = args.num_heads, virtual_node = False).to(device)
+        #model = GNN(gnn_type = 'gineTransformer', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, ff_dim = args.ff_dim, residual = args.residual, num_heads = args.num_heads, virtual_node = False).to(device)
+        model = GINETransformerNet(num_layer=args.num_layer, emb_dim=args.emb_dim,num_classes=args.num_classes,gnn_type='gineTransformer',drop_ratio=args.drop_ratio,ff_dim=args.ff_dim,residual=args.residuals,num_heads=args.num_heads).to(device)
+
+    
     elif args.gnn == 'gineTrans-virtual':
         model = GNN(gnn_type = 'gineTransformer', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, ff_dim = args.ff_dim ,residual = args.residual, num_heads = args.num_heads, virtual_node = True).to(device)
     else:
