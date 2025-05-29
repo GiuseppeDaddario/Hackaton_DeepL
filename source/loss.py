@@ -239,3 +239,166 @@ class LabelSmoothingCrossEntropy(nn.Module):
         # Calcola la KL divergence (o cross-entropy equivalente)
         # mean(sum(-true_dist * pred_log_softmax, dim))
         return torch.mean(torch.sum(-true_dist * pred_log_softmax, dim=self.dim))
+
+
+    import numpy as np
+from keras import backend as K
+import tensorflow as tf
+
+
+def cross_entropy(y_true, y_pred):
+    return K.categorical_crossentropy(y_true, y_pred)
+
+def symmetric_cross_entropy(alpha, beta):
+    def loss(y_true, y_pred):
+        y_true_1 = y_true
+        y_pred_1 = y_pred
+
+        y_true_2 = y_true
+        y_pred_2 = y_pred
+
+        y_pred_1 = tf.clip_by_value(y_pred_1, 1e-7, 1.0)
+        y_true_2 = tf.clip_by_value(y_true_2, 1e-4, 1.0)
+
+        return alpha*tf.reduce_mean(-tf.reduce_sum(y_true_1 * tf.log(y_pred_1), axis = -1)) + beta*tf.reduce_mean(-tf.reduce_sum(y_pred_2 * tf.log(y_true_2), axis = -1))
+    return loss
+
+
+def lsr(y_true, y_pred):
+    epsilon = 0.1
+    y_smoothed_true = y_true * (1 - epsilon - epsilon / 10.0)
+    y_smoothed_true = y_smoothed_true + epsilon / 10.0
+
+    y_pred_1 = tf.clip_by_value(y_pred, 1e-7, 1.0)
+
+    return tf.reduce_mean(-tf.reduce_sum(y_smoothed_true * tf.log(y_pred_1), axis=-1))
+
+def generalized_cross_entropy(y_true, y_pred):
+    """
+    2018 - nips - Generalized Cross Entropy Loss for Training Deep Neural Networks with Noisy Labels.
+    """
+    q = 0.7
+    t_loss = (1 - tf.pow(tf.reduce_sum(y_true * y_pred, axis=-1), q)) / q
+    return tf.reduce_mean(t_loss)
+
+def joint_optimization_loss(y_true, y_pred):
+    """
+    2018 - cvpr - Joint optimization framework for learning with noisy labels.
+    """
+    y_pred_avg = K.mean(y_pred, axis=0)
+    p = np.ones(10, dtype=np.float32) / 10.
+    l_p = - K.sum(K.log(y_pred_avg) * p)
+    l_e = K.categorical_crossentropy(y_pred, y_pred)
+    return K.categorical_crossentropy(y_true, y_pred) + 1.2 * l_p + 0.8 * l_e
+
+def boot_soft(y_true, y_pred):
+    """
+    2015 - iclrws - Training deep neural networks on noisy labels with bootstrapping.
+    """
+    beta = 0.95
+
+    y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
+    y_pred = K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon())
+    return -K.sum((beta * y_true + (1. - beta) * y_pred) *
+                  K.log(y_pred), axis=-1)
+
+
+def boot_hard(y_true, y_pred):
+    """
+    2015 - iclrws - Training deep neural networks on noisy labels with bootstrapping.
+    """
+    beta = 0.8
+
+    y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
+    y_pred = K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon())
+    pred_labels = K.one_hot(K.argmax(y_pred, 1), num_classes=K.shape(y_true)[1])
+    return -K.sum((beta * y_true + (1. - beta) * pred_labels) *
+                  K.log(y_pred), axis=-1)
+
+def forward(P):
+    """
+    Making Deep Neural Networks Robust to Label Noise: a Loss Correction Approach.
+    """
+    P = K.constant(P)
+    def loss(y_true, y_pred):
+        y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
+        y_pred = K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon())
+        return -K.sum(y_true * K.log(K.dot(y_pred, P)), axis=-1)
+
+    return loss
+
+def backward(P):
+    """
+    Making Deep Neural Networks Robust to Label Noise: a Loss Correction Approach.
+    """
+    P_inv = K.constant(np.linalg.inv(P))
+
+    def loss(y_true, y_pred):
+        y_pred /= K.sum(y_pred, axis=-1, keepdims=True)
+        y_pred = K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon())
+        return -K.sum(K.dot(y_true, P_inv) * K.log(y_pred), axis=-1)
+
+    return loss
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class SymmetricCrossEntropyLoss(nn.Module):
+    def __init__(self, alpha=1.0, beta=1.0, num_classes=6, smoothing=0.0, device='cpu'):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.num_classes = num_classes
+        self.smoothing = smoothing # Opzionale, per coerenza
+        self.device = device
+
+    def forward(self, y_pred_logits, y_true_indices):
+        # y_pred_logits: (batch_size, num_classes) - raw outputs from model
+        # y_true_indices: (batch_size) - integer class labels
+
+        y_pred_probs = F.softmax(y_pred_logits, dim=-1)
+
+        y_true_one_hot = F.one_hot(y_true_indices, num_classes=self.num_classes).float().to(self.device)
+
+        if self.smoothing > 0:
+            y_true_one_hot = y_true_one_hot * (1 - self.smoothing) + self.smoothing / self.num_classes
+
+        # Termine 1: Alpha * CE(y_true, y_pred)
+        y_pred_probs_clipped_1 = torch.clamp(y_pred_probs, 1e-7, 1.0)
+        loss_ce = -torch.sum(y_true_one_hot * torch.log(y_pred_probs_clipped_1), dim=-1)
+
+        # Termine 2: Beta * RCE(y_true, y_pred) = Beta * CE(y_pred, y_true_for_log)
+        # La versione Keras clippa y_true_2 (le etichette one-hot) a [1e-4, 1.0] prima del log.
+        # Questo serve per evitare log(0) e rende i target "morbidi" per il termine RCE.
+        y_true_one_hot_clipped_for_log = torch.clamp(y_true_one_hot, 1e-4, 1.0) # Cruciale per replicare
+        loss_rce = -torch.sum(y_pred_probs * torch.log(y_true_one_hot_clipped_for_log), dim=-1) # y_pred_probs non clippato qui
+
+        return self.alpha * torch.mean(loss_ce) + self.beta * torch.mean(loss_rce)
+
+class GeneralizedCrossEntropyLoss(nn.Module):
+    def __init__(self, q=0.7, num_classes=6, smoothing=0.0, device='cpu'):
+        super().__init__()
+        self.q = q
+        self.num_classes = num_classes
+        self.smoothing = smoothing
+        self.device = device
+
+    def forward(self, y_pred_logits, y_true_indices):
+        y_pred_probs = F.softmax(y_pred_logits, dim=-1)
+        y_true_one_hot = F.one_hot(y_true_indices, num_classes=self.num_classes).float().to(self.device)
+
+        if self.smoothing > 0:
+            y_true_one_hot = y_true_one_hot * (1 - self.smoothing) + self.smoothing / self.num_classes
+
+        # tf.reduce_sum(y_true * y_pred, axis=-1) is the probability of the true class if y_true is one-hot
+        # or more generally, the dot product if y_true is soft.
+        # With y_true_one_hot, this is equivalent to gathering the predicted probability for the true class.
+        pred_prob_for_true_class = torch.sum(y_true_one_hot * y_pred_probs, dim=-1)
+
+        # Clamp to avoid issues with pow for very small pred_prob_for_true_class if q is high, or if it's exactly 0 or 1.
+        pred_prob_for_true_class = torch.clamp(pred_prob_for_true_class, 1e-7, 1.0 - 1e-7)
+
+        loss = (1 - torch.pow(pred_prob_for_true_class, self.q)) / self.q
+        return torch.mean(loss)

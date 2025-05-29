@@ -15,7 +15,7 @@ from source.statistics import save_predictions, plot_training_progress
 from source.train import train_epoch
 from source.dataLoader import add_zeros # Utilizzato da GraphDataset
 from source.loadData import GraphDataset # La tua classe GraphDataset
-from source.loss import gcodLoss, LabelSmoothingCrossEntropy
+from source.loss import gcodLoss, LabelSmoothingCrossEntropy, SymmetricCrossEntropyLoss, GeneralizedCrossEntropyLoss
 from source.models import GNN
 from source.utils import set_seed
 
@@ -151,7 +151,14 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
         optimizer_loss_params = None
 
         if args.criterion == "ce":
+            logging.info(f"• Loss function used    : LabelSmoothingCrossEntropy (alpha: {args.sce_alpha}, beta: {args.sce_beta})")
             criterion_obj = LabelSmoothingCrossEntropy(classes=num_dataset_classes, smoothing=args.label_smoothing).to(device)
+        elif args.criterion == "sce":
+            logging.info(f"• Loss function used    : SymmetricCrossEntropy (alpha: {args.sce_alpha}, beta: {args.sce_beta})")
+            criterion_obj = SymmetricCrossEntropyLoss(alpha=args.sce_alpha, beta=args.sce_beta, num_classes=num_dataset_classes, device=device).to(device)
+        elif args.criterion == "gce":
+            logging.info(f"• Loss function used    : GeneralizedCrossEntropy (q: {args.gce_q})")
+            criterion_obj = GeneralizedCrossEntropyLoss(q=args.gce_q, num_classes=num_dataset_classes, device=device).to(device)
         elif args.criterion == "gcod":
 
             if not hasattr(full_train_dataset, 'graphs_dicts_list'):
@@ -334,7 +341,10 @@ if __name__ == "__main__":
     parser.add_argument('--val_split_ratio', type=float, default=0.15, help='Fraction of training data to use for validation (default: 0.15)')
 
     # Loss Function and GCOD specific
-    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod"], help="Type of loss to use (default: ce)")
+    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod","sce","gce"], help="Type of loss to use (default: ce)")
+    parser.add_argument('--sce_alpha', type=float, default=1.0, help='Alpha for Symmetric CE.')
+    parser.add_argument('--sce_beta', type=float, default=1.0, help='Beta for Symmetric CE.')
+    parser.add_argument('--gce_q', type=float, default=0.7, help='q for Generalized CE.')
     parser.add_argument('--label_smoothing', type=float, default=0.1, help='Amount of label smoothing for CE loss (default: 0.1, use 0 for no smoothing)')
     parser.add_argument("--lr_u", type=float, default=0.01, help="Learning rate for 'u' parameters in GCOD (default: 0.01)")
     parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss (default: 0.7)")
