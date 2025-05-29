@@ -316,7 +316,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
                 lambda_l3_weight=args.lambda_l3_weight, current_epoch=epoch,
                 atrain_global_value=atrain_global,
                 save_checkpoints=(epoch + 1 in checkpoint_intervals), checkpoint_path=os.path.join(checkpoints_folder_epochs, f"model_epoch_{epoch+1}"),
-                epoch_boost_active=(args.criterion == "gcod" and args.epoch_boost > 0 and epoch < args.epoch_boost), # Passa lo stato di epoch_boost
+                epoch_boost=args.epoch_boost,
                 gradient_clipping_norm=args.gradient_clipping
             )
             train_losses_history.append(avg_train_loss)
