@@ -341,9 +341,6 @@ def backward(P):
     return loss
 
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 class SymmetricCrossEntropyLoss(nn.Module):
     def __init__(self, alpha=1.0, beta=1.0, num_classes=6, smoothing=0.0, device='cpu'):
