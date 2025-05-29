@@ -62,27 +62,12 @@ def evaluate_model(
             all_preds_list.extend(predicted_labels.cpu().numpy().tolist())
 
             current_num_graphs_in_batch = data_batch.num_graphs if hasattr(data_batch, 'num_graphs') else output_logits.size(0)
-            # total_samples_for_metrics era incrementato qui, ma ha più senso farlo solo se ci sono etichette per la validazione
-            # o comunque contare tutti i grafi processati. Per coerenza con la loss, lo lascio qui.
-            # Se is_validation è False, questo conta solo i grafi per cui si fanno predizioni.
             total_samples_for_metrics += current_num_graphs_in_batch
 
 
             if is_validation:
                 if not hasattr(data_batch, 'y') or data_batch.y is None:
                     print(f"Warning: data_batch.y is None for a sample during validation. Skipping loss/metric calculation for this sample if all y in batch are None.")
-                    # Se TUTTI y nel batch sono None, e criterion_obj è presente, potresti comunque voler saltare la loss.
-                    # Per ora, procediamo e la loss potrebbe fallire se y è necessario e non c'è.
-                    # O potresti accumulare solo le predizioni e non aggiornare la loss per questo batch.
-                    # L'approccio più semplice è continuare se ALMENO UN y è presente per la loss.
-                    # Se nessuno è presente, la loss non dovrebbe essere calcolata.
-                    # Il controllo più robusto sarebbe: if data_batch.y is None or data_batch.y.numel() == 0: continue (se la loss fallisce)
-                    # Per ora, continuiamo e affidiamoci al fatto che la loss gestisca y=None se necessario,
-                    # o che ci sia almeno un y per il calcolo della loss.
-                    # Il 'continue' che era qui era indentato male.
-                    # La logica originale era: se y è None E criterion_obj è None, allora continue.
-                    # Ma se is_validation=True, criterion_obj non dovrebbe essere None.
-                    # Rimuovo il 'continue' problematico per ora e lascio che la logica della loss gestisca.
                     pass # Rimosso il continue problematico, la logica sotto gestirà y
 
                 true_labels_int = data_batch.y.to(device) # Questo fallirà se data_batch.y è None
@@ -90,8 +75,7 @@ def evaluate_model(
                 correct_predictions_count += (predicted_labels == true_labels_int.squeeze()).sum().item()
 
                 if criterion_obj is None:
-                    # Questo scenario non dovrebbe accadere se is_validation=True e lo script principale
-                    # passa un criterion_obj per la validazione.
+
                     print("Warning: criterion_obj is None during validation. Loss will be 0.")
                     loss = torch.tensor(0.0, device=device)
                 elif criterion_type == "ce":
@@ -145,6 +129,5 @@ def evaluate_model(
                 f1_value = 0.0
         else:
             print("Warning: Nessun campione o etichetta valida per calcolare le metriche di validazione.")
-    # else (is_validation=False): avg_loss, accuracy, f1 rimangono 0.0
 
     return avg_loss_value, accuracy_value, f1_value, all_preds_list, all_labels_list
