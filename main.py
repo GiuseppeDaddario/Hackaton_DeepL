@@ -445,7 +445,7 @@ if __name__ == "__main__":
     parser.add_argument('--emb_dim', type=int, default=128, help='Dimensionality of hidden units.') # Era 204, standardizzato a 128
     parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio.')
     parser.add_argument('--transformer_heads', type=int, default=4, help='Num heads for TransformerConv.')
-    parser.add_argument('--transformer_layers', type=int, default=4, help='Num heads for TransformerConv.')# Specifico per Transformer
+    parser.add_argument('--transformer_layers', type=int, default=1, help='Num heads for TransformerConv.')# Specifico per Transformer
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (used if not inferred).')
     parser.add_argument('--jk_mode', type=str, default="last", help="Jumping Knowledge mode.") # Non per GINE base
     parser.add_argument('--graph_pooling', type=str, default="add", choices=["sum", "mean", "max", "add"], help="Graph pooling method for GINE.") # "attention", "set2set" rimossi perché non in GINE base
