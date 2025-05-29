@@ -1,7 +1,7 @@
 import torch
 from torch_geometric.nn import TransformerConv, \
     global_add_pool, GlobalAttention, global_max_pool, \
-    global_mean_pool
+    global_mean_pool, GINEConv
 import torch.nn.functional as F
 
 # Nuovo Blocco Transformer Convoluzionale
@@ -72,6 +72,15 @@ class GNN_node(torch.nn.Module):
         for layer in range(num_layer):
             if self.gnn_type == 'transformer':
                 self.convs.append(TransformerConvBlock(emb_dim, num_heads=transformer_heads, dropout_ratio=drop_ratio))
+            elif self.gnn_type == 'gine':
+                # GINEConv richiede un MLP per il suo argomento 'nn'
+                # Questo MLP trasforma le feature aggregate (incluse quelle del nodo stesso)
+                gine_nn = torch.nn.Sequential(
+                    torch.nn.Linear(emb_dim, emb_dim * 2), # Espande la dimensionalità
+                    torch.nn.LeakyReLU(),
+                    torch.nn.Linear(emb_dim * 2, emb_dim)  # Riporta alla dimensionalità originale
+                )
+                self.convs.append(GINEConv(nn=gine_nn, eps=0., train_eps=True, edge_dim=emb_dim))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
 
