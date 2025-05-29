@@ -39,8 +39,8 @@ def evaluate_model(
 
             model_output = model(data_batch)
             if isinstance(model_output, tuple) and len(model_output) >= 2 :
-                output_logits = model_output[0]
-                graph_embeddings = model_output[1]
+                output_logits = model_output[0] if isinstance(model_output, tuple) else model_output
+                graph_embeddings = model_output[1] if isinstance(model_output, tuple) and len(model_output) > 1 else None
             elif isinstance(model_output, torch.Tensor):
                 output_logits = model_output
             else:

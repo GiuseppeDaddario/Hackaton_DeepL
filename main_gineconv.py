@@ -23,6 +23,8 @@ from source.utils import set_seed
 set_seed()
 
 
+# In main_gineconv.py
+
 def calculate_global_train_accuracy(model, full_train_loader, device):
     model.eval()
     correct = 0
@@ -30,9 +32,23 @@ def calculate_global_train_accuracy(model, full_train_loader, device):
     with torch.no_grad():
         for data_batch in tqdm(full_train_loader, desc="Calculating global train accuracy (atrain)", unit="batch", leave=False, disable=True):
             graphs = data_batch.to(device)
+            if graphs.y is None: continue
             labels_int = graphs.y.to(device)
-            outputs_logits = model(graphs) # Modificato: GINENet restituisce solo logits
-            _, predicted = torch.max(outputs_logits.data, 1)
+
+            # Gestisci l'output del modello
+            model_output = model(graphs) # model_output è ora un tuple (logits, embeddings)
+
+            # Estrai i logits dal tuple
+            # Assumiamo che i logits siano il primo elemento del tuple restituito da GINENetWithTransformer
+            actual_logits = model_output[0] if isinstance(model_output, tuple) else model_output
+
+            if actual_logits.shape[0] == 0: continue
+
+            # Usa actual_logits.data (se actual_logits è un tensore con requires_grad=True)
+            # o semplicemente actual_logits se non ha .data o non è necessario
+            # Per torch.max, di solito non è necessario .data se sei in torch.no_grad()
+            _, predicted = torch.max(actual_logits, 1) # Modificato qui
+
             total += labels_int.size(0)
             correct += (predicted == labels_int.squeeze()).sum().item()
     if total == 0: return 0.0
