@@ -153,20 +153,53 @@ def main(args):
         model.load_state_dict(torch.load(checkpoint_path))
         print(f"Loaded best model from {checkpoint_path}")
 
-    # Prepare test dataset and loader
-    test_dataset = GraphDataset(args.test_path, transform=add_zeros)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    
+    
+    ####################################
+    ###      UPLOADING DATASETS      ### 
+    ####################################
 
-    # If train_path is provided, train the model
+    from torch.utils.data import random_split
+
+    print("-------- Loading datasets --------")
+    train_dataset = GraphDataset(args.train_path, transform=add_zeros)
+    test_dataset = GraphDataset(args.test_path, transform=add_zeros)  # TestSet to be labelled
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False) # TestSet to be labelled
+    print("-------- Datasets loaded --------")
+
+
+
+    
+    # Split dataset: 80% train, 20% validation
+    train_size = int(0.8 * len(train_dataset))
+    valid_size = len(train_dataset) - train_size
+    train_subset, valid_subset = random_split(train_dataset, [train_size, valid_size])
+
+    # DataLoaders for training and validation
+    train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True)
+    valid_loader = DataLoader(valid_subset, batch_size=args.batch_size, shuffle=False)
+
+
+
+
+
+
+
+
+    # TRAINING:
     if args.train_path:
-        train_dataset = GraphDataset(args.train_path, transform=add_zeros)
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        #train_dataset = GraphDataset(args.train_path, transform=add_zeros)
+        #train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+
+
 
         # Training loop
         num_epochs = args.epochs
         best_accuracy = 0.0
         train_losses = []
         train_accuracies = []
+        valid_losses = []
+        valid_accuracies = []
 
         # Calculate intervals for saving checkpoints
         if num_checkpoints > 1:
@@ -182,12 +215,19 @@ def main(args):
                 current_epoch=epoch
             )
             train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
+            valid_acc, _ = evaluate(valid_loader, model, device, calculate_accuracy=True)
+
             print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
             
-            # Save logs for training progress
+            # TRAINING EVALUATION
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
-            logging.info(f"Epoch {epoch + 1}/{num_epochs} | T-Loss: {train_loss:.4f} | T-Acc: {train_acc:.4f} V-Loss: |V-Acc: | T-f1: | V-f1: " )
+            
+            ## VALIDATION EVALUATION
+            #valid_losses.append(valid_loss)
+            valid_accuracies.append(valid_acc)
+            
+            logging.info(f"Epoch {epoch + 1}/{num_epochs} | T-Loss: {train_loss:.4f} | T-Acc: {train_acc:.4f} V-Loss:  |V-Acc: {valid_acc:.4f}| T-f1: | V-f1: " )
 
             # Save best model
             if train_acc > best_accuracy:
