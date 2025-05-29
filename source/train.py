@@ -46,7 +46,7 @@ def train_epoch(
 
         # --- Forward pass del modello ---
         if criterion_type == "gcod":
-            output_logits, graph_embeddings, _ = model(data_batch) # (N, C), (N, emb_dim)
+            output_logits, graph_embeddings = model(data_batch) # (N, C), (N, emb_dim)
         else:
             output_logits = model(data_batch) # (N, C), (N, emb_dim)
 

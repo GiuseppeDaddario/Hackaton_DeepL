@@ -220,7 +220,7 @@ class GNN(torch.nn.Module):
 
 
 
-class GINEncoderBlock(nn.Module): # Assicurati che questa sia definita
+class GINEncoderBlock(nn.Module):
     def __init__(self, hidden_dim, dropout_rate, edge_dim_in_gine):
         super().__init__()
         mlp = nn.Sequential(
@@ -228,7 +228,6 @@ class GINEncoderBlock(nn.Module): # Assicurati che questa sia definita
             nn.ReLU(),
             nn.Linear(hidden_dim * 2, hidden_dim)
         )
-        # train_eps era nel GINEConv ma non è un parametro di GINEncoderBlock
         self.conv = GINEConv(mlp, train_eps=True, edge_dim=edge_dim_in_gine)
         self.norm = BatchNorm(hidden_dim)
         self.relu = nn.ReLU()
@@ -238,28 +237,28 @@ class GINEncoderBlock(nn.Module): # Assicurati che questa sia definita
         x_residual = x
         x_conv = self.conv(x, edge_index, edge_attr=edge_attr)
         x_norm = self.norm(x_conv)
-        x_sum = x_norm + x_residual # Connessione residuale
+        x_sum = x_norm + x_residual
         x_relu = self.relu(x_sum)
         x_drop = self.dropout(x_relu)
         return x_drop
 
 class GINENet(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
-                 edge_dim=0, # train_eps non è un param di GINENet, ma di GINEConv
-                 dropout_rate=0.5, graph_pooling="mean"): # graph_pooling invece di pool_type
+                 edge_dim=0,
+                 dropout_rate=0.5, graph_pooling="mean"):
         super().__init__()
         self.num_layers = num_layers
         self.dropout_rate = dropout_rate
-        self.graph_pooling_type = graph_pooling # Salva il tipo di pooling
+        self.graph_pooling_type = graph_pooling
 
         self.node_encoder = nn.Linear(in_channels, hidden_channels)
 
-        if edge_dim is not None and edge_dim > 0: # Controllo aggiuntivo per edge_dim
+        if edge_dim is not None and edge_dim > 0:
             self.edge_encoder = nn.Linear(edge_dim, hidden_channels)
             self.gine_edge_dim_for_conv = hidden_channels
         else:
             self.edge_encoder = None
-            self.gine_edge_dim_for_conv = None # GINEConv gestirà edge_attr=None o se edge_dim=0 o None
+            self.gine_edge_dim_for_conv = None
 
         self.convs = nn.ModuleList()
         for _ in range(num_layers):
@@ -284,41 +283,60 @@ class GINENet(nn.Module):
     def forward(self, data):
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
 
+        # Gestione input vuoto o problematico
         if x is None or x.numel() == 0:
             logging.warning(f"GINENet: Input node features 'x' is None or empty. original_idx: {data.original_idx if hasattr(data, 'original_idx') else 'N/A'}")
             num_graphs_in_batch = data.num_graphs if hasattr(data, 'num_graphs') else 1
-            return torch.zeros((num_graphs_in_batch, self.output_mlp[-1].out_features), device=edge_index.device if edge_index is not None else 'cpu')
+            # Determina il device corretto
+            output_device = edge_index.device if hasattr(edge_index, 'device') and edge_index is not None else (x.device if x is not None else 'cpu')
 
+            # Restituisci tuple con tensori vuoti/zeri delle dimensioni corrette
+            dummy_logits = torch.zeros((num_graphs_in_batch, self.output_mlp[-1].out_features), device=output_device)
+            dummy_embeddings = torch.zeros((num_graphs_in_batch, self.output_mlp[0].in_features), device=output_device) # hidden_channels
+            return dummy_logits, dummy_embeddings # Modificato per restituire 2 valori
+
+        # Encoding dei nodi
         x = self.node_encoder(x)
-        x = F.relu(x) # Attivazione dopo l'encoder iniziale
+        x = F.relu(x)
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
 
-
-        current_edge_attr = edge_attr # Usa una variabile locale
+        # Encoding degli archi (se presenti)
+        current_edge_attr = edge_attr
         if self.edge_encoder and current_edge_attr is not None:
-            if current_edge_attr.numel() > 0: # Solo se ci sono edge_attr
+            if current_edge_attr.numel() > 0:
                 current_edge_attr = self.edge_encoder(current_edge_attr)
-            else: # edge_attr è un tensore vuoto, l'encoder non può processarlo, lascialo vuoto
-                pass # o current_edge_attr = None se GINEConv lo preferisce così
+            # else: current_edge_attr rimane un tensore vuoto, GINEConv dovrebbe gestirlo
 
-
+        # Layer convoluzionali GIN
         for conv_layer in self.convs:
             x = conv_layer(x, edge_index, current_edge_attr)
 
+        # Gestione del batch per il pooling
         current_batch_assignment = batch
-        if current_batch_assignment is None:
-            if x.numel() > 0 :
+        if current_batch_assignment is None: # Se si processa un singolo grafo non batchato
+            if x.numel() > 0:
                 current_batch_assignment = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
-            else:
-                pass
+            # else: x è vuoto, gestito sopra
 
-        if x.numel() > 0 and current_batch_assignment is not None :
+        # Pooling per ottenere gli embedding dei grafi
+        x_pooled = None # Inizializza
+        if x.numel() > 0 and current_batch_assignment is not None:
             x_pooled = self.pool(x, current_batch_assignment)
-        elif x.numel() > 0 and current_batch_assignment is None:
+        elif x.numel() > 0 and current_batch_assignment is None: # Fallback per singolo grafo se il batch non è determinato
             x_pooled = x.mean(dim=0, keepdim=True)
-        else:
-            num_graphs_in_batch = data.num_graphs if hasattr(data, 'num_graphs') else 1
-            return torch.zeros((num_graphs_in_batch, self.output_mlp[-1].out_features), device=edge_index.device if edge_index is not None else 'cpu')
+        else: # x è vuoto, gestito all'inizio del forward
 
+            # Questo blocco non dovrebbe essere raggiunto se la gestione di x vuoto all'inizio funziona
+            logging.error("GINENet: x_pooled non può essere calcolato perché x è vuoto o current_batch_assignment è problematico, nonostante i controlli iniziali.")
+            num_graphs_in_batch = data.num_graphs if hasattr(data, 'num_graphs') else 1
+            output_device = edge_index.device if hasattr(edge_index, 'device') and edge_index is not None else (data.x.device if data.x is not None else 'cpu')
+            dummy_logits = torch.zeros((num_graphs_in_batch, self.output_mlp[-1].out_features), device=output_device)
+            dummy_embeddings = torch.zeros((num_graphs_in_batch, self.output_mlp[0].in_features), device=output_device)
+            return dummy_logits, dummy_embeddings # Modificato
+
+
+        # MLP di Output per i logits
         out_logits = self.output_mlp(x_pooled)
-        return out_logits
+
+        # Restituisci i logits e gli embedding del grafo (x_pooled)
+        return out_logits, x_pooled

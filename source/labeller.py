@@ -152,8 +152,8 @@ if __name__ == "__main__":
 
         # Parametri per la costruzione del modello (DEVONO CORRISPONDERE AL TRAINING)
         gnn_type='gine',                           # Coerente con GINENet
-        num_layer=2,                               # Esempio, deve corrispondere al training
-        emb_dim=64,                               # Esempio, deve corrispondere al training
+        num_layer=5,                               # Esempio, deve corrispondere al training
+        emb_dim=300,                               # Esempio, deve corrispondere al training
         drop_ratio=0.2,                            # Esempio, deve corrispondere al training
         graph_pooling='mean',                      # Esempio, deve corrispondere al training
         node_feat_dim_initial=1,                   # Esempio, deve corrispondere al training
