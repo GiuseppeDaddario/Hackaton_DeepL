@@ -117,14 +117,11 @@ def main(args):
 
     # TRAINING:
     if args.train_path:
-        #train_dataset = GraphDataset(args.train_path, transform=add_zeros)
-        #train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-
-
 
         # Training loop
         num_epochs = args.epochs
         best_accuracy = 0.0
+        best_f1 = 0.0
         train_losses = []
         train_accuracies = []
         valid_losses = []
@@ -159,11 +156,17 @@ def main(args):
             
             logging.info(f"|Epoch {epoch + 1}/{num_epochs} | T-Loss: {train_loss:.4f} | T-Acc: {train_acc:.4f} V-Loss: {valid_loss:.4f} |V-Acc: {valid_acc:.4f}| T-f1: {train_f1:.4f} | V-f1: {valid_f1:.4f} " )
 
-            # Save best model
-            if train_acc > best_accuracy:
-                best_accuracy = train_acc
+            # Save best model (Accuracy)
+            # if valid_acc > best_accuracy:
+            #    best_accuracy = train_acc
+            #    torch.save(model.state_dict(), checkpoint_path)
+            #    print(f"Best V-acc updated and saved at {checkpoint_path}")
+            
+            # Save best model (F1)
+            if valid_f1 > best_f1:
+                best_f1 = valid_f1
                 torch.save(model.state_dict(), checkpoint_path)
-                print(f"Best model updated and saved at {checkpoint_path}")
+                print(f"Best F1 model updated and saved at {checkpoint_path}")
 
         # Plot training progress in current directory
         plot_training_progress(train_losses, train_accuracies, os.path.join(logs_folder, "plots"))

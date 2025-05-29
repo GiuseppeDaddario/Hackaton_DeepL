@@ -125,6 +125,90 @@ class GCNConv(MessagePassing):
 
 
 
+#####################################
+###       GINE + TRANSFORMER     ####
+#####################################
+
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
+
+class GINETransformerNet(torch.nn.Module):
+    def __init__(self, num_layer, emb_dim, num_classes, num_heads, ff_dim, drop_ratio, gnn_type='gine', residual=True):
+        super(GINETransformerNet, self).__init__()
+
+        # FIRST LAYER: GNN for node embeddings
+        self.gnn = GNN_node(
+            num_layer=num_layer,
+            emb_dim=emb_dim,
+            drop_ratio=drop_ratio,
+            JK="last",
+            residual=residual,
+            gnn_type=gnn_type
+        )
+
+        # SECOND LAYER: Transformer for graph-level representation
+        encoder_layer = TransformerEncoderLayer(
+            d_model=emb_dim,
+            nhead=num_heads,
+            dim_feedforward=ff_dim,
+            dropout=drop_ratio,
+            batch_first=True  # Important for node-level input
+        )
+        
+        # THIRD LAYER: Transformer Encoder
+        self.transformer = TransformerEncoder(encoder_layer, num_layers=1)
+
+        # FOURTH LAYER: MLP head for classification
+        self.mlp_head = torch.nn.Sequential(
+            torch.nn.Linear(emb_dim, emb_dim),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(drop_ratio),
+            torch.nn.Linear(emb_dim, num_classes)
+        )
+
+
+
+    def forward(self, data):
+        x = self.gnn(data)  # Node embeddings [num_nodes, emb_dim]
+
+        # Group nodes into graphs using batch info
+        batch = data.batch  # [num_nodes]
+        max_nodes = batch.bincount().max().item()
+
+        # Pad graphs to fixed size for Transformer
+        padded_x = torch.zeros(batch.size(0), max_nodes, x.size(-1), device=x.device)
+        mask = torch.zeros(batch.size(0), max_nodes, dtype=torch.bool, device=x.device)
+
+        for i in range(batch.max() + 1):
+            node_idx = (batch == i).nonzero(as_tuple=False).view(-1)
+            padded_x[i, :len(node_idx)] = x[node_idx]
+            mask[i, :len(node_idx)] = True
+
+        # Pass through transformer
+        encoded = self.transformer(padded_x, src_key_padding_mask=~mask)
+
+        # Readout: mean over valid nodes
+        masked_encoded = encoded * mask.unsqueeze(-1)
+        graph_reps = masked_encoded.sum(dim=1) / mask.sum(dim=1, keepdim=True)
+
+        return self.mlp_head(graph_reps)
+    
+    ################################
+    ################################
+
+
+
+
+
+
+
+
+
+
+
+################################################
+####            EMBEDDING NODES             ####
+################################################
+
 ### GNN to generate node embedding
 class GNN_node(torch.nn.Module):
     """
@@ -304,70 +388,12 @@ class GNN_node_Virtualnode(torch.nn.Module):
 
         return node_representation
 
+################################################
+################################################
 
 
 
-#####################################
-###       GINE + TRANSFORMER     ####
-#####################################
 
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
-class GINETransformerNet(torch.nn.Module):
-    def __init__(self, num_layer, emb_dim, num_classes=6, num_heads=4, ff_dim=256, drop_ratio=0.5, gnn_type='gine', residual=True):
-        super(GINETransformerNet, self).__init__()
 
-        self.gnn = GNN_node(
-            num_layer=num_layer,
-            emb_dim=emb_dim,
-            drop_ratio=drop_ratio,
-            JK="last",
-            residual=residual,
-            gnn_type=gnn_type
-        )
 
-        # Transformer encoder layer
-        encoder_layer = TransformerEncoderLayer(
-            d_model=emb_dim,
-            nhead=num_heads,
-            dim_feedforward=ff_dim,
-            dropout=drop_ratio,
-            batch_first=True  # Important for node-level input
-        )
-        self.transformer = TransformerEncoder(encoder_layer, num_layers=1)
-
-        # Output MLP classifier
-        self.mlp_head = torch.nn.Sequential(
-            torch.nn.Linear(emb_dim, emb_dim),
-            torch.nn.ReLU(),
-            torch.nn.Dropout(drop_ratio),
-            torch.nn.Linear(emb_dim, num_classes)
-        )
-
-    def forward(self, data):
-        x = self.gnn(data)  # Node embeddings [num_nodes, emb_dim]
-
-        # Group nodes into graphs using batch info
-        batch = data.batch  # [num_nodes]
-        max_nodes = batch.bincount().max().item()
-
-        # Pad graphs to fixed size for Transformer
-        padded_x = torch.zeros(batch.size(0), max_nodes, x.size(-1), device=x.device)
-        mask = torch.zeros(batch.size(0), max_nodes, dtype=torch.bool, device=x.device)
-
-        for i in range(batch.max() + 1):
-            node_idx = (batch == i).nonzero(as_tuple=False).view(-1)
-            padded_x[i, :len(node_idx)] = x[node_idx]
-            mask[i, :len(node_idx)] = True
-
-        # Pass through transformer
-        encoded = self.transformer(padded_x, src_key_padding_mask=~mask)
-
-        # Readout: mean over valid nodes
-        masked_encoded = encoded * mask.unsqueeze(-1)
-        graph_reps = masked_encoded.sum(dim=1) / mask.sum(dim=1, keepdim=True)
-
-        return self.mlp_head(graph_reps)
-    
-    ################################
-    ################################
