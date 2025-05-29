@@ -116,8 +116,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
             num_layers=args.num_layer,
             edge_dim=num_edge_features_resolved,
             train_eps=True, # Puoi renderlo un argomento del parser se necessario
-            dropout_rate=args.drop_ratio,
-            graph_pooling_type=args.graph_pooling # Passa il tipo di pooling
+            dropout_rate=args.drop_ratio # Passa il tipo di pooling
         ).to(device)
     elif args.gnn_type == 'transformer':
         model = GNN(
