@@ -6,7 +6,55 @@ from torch_geometric.utils import degree
 
 import math
 
-### GIN convolution along the graph structure
+
+
+
+
+
+##################################################
+### GINE convolution along the graph structure ###
+##################################################
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import MessagePassing
+
+class GINEConv(MessagePassing):
+    def __init__(self, emb_dim):
+        super(GINEConv, self).__init__(aggr="add")
+        self.edge_encoder = nn.Linear(7, emb_dim)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(emb_dim, 2 * emb_dim),
+            nn.ReLU(),
+            nn.Linear(2 * emb_dim, emb_dim),
+            nn.BatchNorm1d(emb_dim)
+        )
+
+        self.eps = nn.Parameter(torch.Tensor([0]))
+
+    def forward(self, x, edge_index, edge_attr):
+        edge_embedding = self.edge_encoder(edge_attr)
+        out = self.propagate(edge_index, x=x, edge_attr=edge_embedding)
+        out = self.mlp((1 + self.eps) * x + out)
+        return out
+
+    def message(self, x_j, edge_attr):
+        return F.relu(x_j + edge_attr)
+    
+
+###############################################
+###############################################
+
+
+
+
+
+
+################################################
+### GIN convolution along the graph structure ##
+################################################
+
 class GINConv(MessagePassing):
     def __init__(self, emb_dim):
         '''
@@ -31,8 +79,17 @@ class GINConv(MessagePassing):
 
     def update(self, aggr_out):
         return aggr_out
+    
+###############################################
+###############################################
 
-### GCN convolution along the graph structure
+
+
+
+################################################
+### GCN convolution along the graph structure ##
+################################################
+
 class GCNConv(MessagePassing):
     def __init__(self, emb_dim):
         super(GCNConv, self).__init__(aggr='add')
@@ -61,6 +118,11 @@ class GCNConv(MessagePassing):
 
     def update(self, aggr_out):
         return aggr_out
+####################################
+####################################
+
+
+
 
 
 ### GNN to generate node embedding
@@ -97,6 +159,8 @@ class GNN_node(torch.nn.Module):
                 self.convs.append(GINConv(emb_dim))
             elif gnn_type == 'gcn':
                 self.convs.append(GCNConv(emb_dim))
+            elif gnn_type == 'gine':
+                self.convs.append(GINEConv(emb_dim))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
 
@@ -176,6 +240,8 @@ class GNN_node_Virtualnode(torch.nn.Module):
                 self.convs.append(GINConv(emb_dim))
             elif gnn_type == 'gcn':
                 self.convs.append(GCNConv(emb_dim))
+            elif gnn_type == 'gine':
+                self.convs.append(GINEConv(emb_dim))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
 
@@ -233,3 +299,71 @@ class GNN_node_Virtualnode(torch.nn.Module):
                 node_representation += h_list[layer]
 
         return node_representation
+
+
+
+
+#####################################
+### TRANSFORMER
+#####################################
+
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
+
+class GINETransformerNet(torch.nn.Module):
+    def __init__(self, num_layer, emb_dim, num_classes=6, num_heads=4, ff_dim=256, drop_ratio=0.5, gnn_type='gine', residual=True):
+        super(GINETransformerNet, self).__init__()
+
+        self.gnn = GNN_node(
+            num_layer=num_layer,
+            emb_dim=emb_dim,
+            drop_ratio=drop_ratio,
+            JK="last",
+            residual=residual,
+            gnn_type=gnn_type
+        )
+
+        # Transformer encoder layer
+        encoder_layer = TransformerEncoderLayer(
+            d_model=emb_dim,
+            nhead=num_heads,
+            dim_feedforward=ff_dim,
+            dropout=drop_ratio,
+            batch_first=True  # Important for node-level input
+        )
+        self.transformer = TransformerEncoder(encoder_layer, num_layers=1)
+
+        # Output MLP classifier
+        self.mlp_head = torch.nn.Sequential(
+            torch.nn.Linear(emb_dim, emb_dim),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(drop_ratio),
+            torch.nn.Linear(emb_dim, num_classes)
+        )
+
+    def forward(self, data):
+        x = self.gnn(data)  # Node embeddings [num_nodes, emb_dim]
+
+        # Group nodes into graphs using batch info
+        batch = data.batch  # [num_nodes]
+        max_nodes = batch.bincount().max().item()
+
+        # Pad graphs to fixed size for Transformer
+        padded_x = torch.zeros(batch.size(0), max_nodes, x.size(-1), device=x.device)
+        mask = torch.zeros(batch.size(0), max_nodes, dtype=torch.bool, device=x.device)
+
+        for i in range(batch.max() + 1):
+            node_idx = (batch == i).nonzero(as_tuple=False).view(-1)
+            padded_x[i, :len(node_idx)] = x[node_idx]
+            mask[i, :len(node_idx)] = True
+
+        # Pass through transformer
+        encoded = self.transformer(padded_x, src_key_padding_mask=~mask)
+
+        # Readout: mean over valid nodes
+        masked_encoded = encoded * mask.unsqueeze(-1)
+        graph_reps = masked_encoded.sum(dim=1) / mask.sum(dim=1, keepdim=True)
+
+        return self.mlp_head(graph_reps)
+    
+    ################################
+    ################################
