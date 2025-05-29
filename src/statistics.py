@@ -82,7 +82,7 @@ import os
 
 def save_predictions(predictions, test_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    submission_folder = os.path.join(script_dir, "submission")
+    submission_folder = os.path.join(os.path.dirname(script_dir), "submission")
     test_dir_name = os.path.basename(os.path.dirname(test_path)) #Extracts: A/B/C/D
     
     os.makedirs(submission_folder, exist_ok=True)
@@ -113,25 +113,42 @@ def save_predictions(predictions, test_path):
 ##################################
 
 
-def plot_training_progress(train_losses, train_accuracies, output_dir):
+def plot_training_progress(train_losses, train_accuracies, train_f1s,
+                           valid_losses, valid_accuracies, valid_f1s,
+                           output_dir):
     epochs = range(1, len(train_losses) + 1)
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(18, 6))  # Più larga per i 3 grafici
 
-    # Plot loss
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, train_losses, label="Training Loss", color='blue')
+    # Plot Loss
+    plt.subplot(1, 3, 1)
+    plt.plot(epochs, train_losses, label="Train Loss", color='blue')
+    plt.plot(epochs, valid_losses, label="Valid Loss", color='skyblue')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training Loss per Epoch')
+    plt.title('Loss per Epoch')
+    plt.legend()
+    plt.grid(True)
 
-    # Plot accuracy
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, train_accuracies, label="Training Accuracy", color='green')
+    # Plot Accuracy
+    plt.subplot(1, 3, 2)
+    plt.plot(epochs, train_accuracies, label="Train Accuracy", color='green')
+    plt.plot(epochs, valid_accuracies, label="Valid Accuracy", color='lightgreen')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
-    plt.title('Training Accuracy per Epoch')
+    plt.title('Accuracy per Epoch')
+    plt.legend()
+    plt.grid(True)
 
-    # Save plots in the current directory
+    # Plot F1-score
+    plt.subplot(1, 3, 3)
+    plt.plot(epochs, train_f1s, label="Train F1", color='orange')
+    plt.plot(epochs, valid_f1s, label="Valid F1", color='gold')
+    plt.xlabel('Epoch')
+    plt.ylabel('F1 Score')
+    plt.title('F1 Score per Epoch')
+    plt.legend()
+    plt.grid(True)
+
     os.makedirs(output_dir, exist_ok=True)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "training_progress.png"))
@@ -140,3 +157,6 @@ def plot_training_progress(train_losses, train_accuracies, output_dir):
 
 ##################################
 ##################################
+
+
+

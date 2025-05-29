@@ -126,6 +126,8 @@ def main(args):
         train_accuracies = []
         valid_losses = []
         valid_accuracies = []
+        valid_f1s = []
+        train_f1s = []
 
         # Calculate intervals for saving checkpoints
         if num_checkpoints > 1:
@@ -151,8 +153,10 @@ def main(args):
             # Stacking losses and accuracies for plotting
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
+            train_f1s.append(train_f1)
             valid_losses.append(valid_loss)
             valid_accuracies.append(valid_acc)
+            valid_f1s.append(valid_f1)
             
             logging.info(f"|Epoch {epoch + 1}/{num_epochs} | T-Loss: {train_loss:.4f} | T-Acc: {train_acc:.4f} V-Loss: {valid_loss:.4f} |V-Acc: {valid_acc:.4f}| T-f1: {train_f1:.4f} | V-f1: {valid_f1:.4f} " )
 
@@ -169,7 +173,7 @@ def main(args):
                 print(f"Best F1 model updated and saved at {checkpoint_path}")
 
         # Plot training progress in current directory
-        plot_training_progress(train_losses, train_accuracies, os.path.join(logs_folder, "plots"))
+        plot_training_progress(train_losses, train_accuracies,train_f1s,valid_losses,valid_accuracies,valid_f1s, os.path.join(logs_folder, "plots"))
 
     # Generate predictions for the test set using the best model
     model.load_state_dict(torch.load(checkpoint_path))
@@ -188,7 +192,7 @@ if __name__ == "__main__":
     ## GENERIC
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
     parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
-    parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 10)')
+    parser.add_argument('--epochs', type=int, default=1, help='number of epochs to train (default: 10)')
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
     
     ## GNN-specific parameters
