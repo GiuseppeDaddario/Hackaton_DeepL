@@ -373,7 +373,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
 
             avg_val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0
             if val_loader: # Solo se esiste un validation loader
-                avg_val_loss, val_acc, val_f1, _, _ = evaluate_model( # Assumo restituisca (loss, acc, f1, preds, labels)
+                avg_val_loss, val_acc, val_f1 = evaluate_model( # Assumo restituisca (loss, acc, f1, preds, labels)
                     model=model, loader=val_loader, device=device,
                     criterion_obj=current_criterion_obj,
                     criterion_type=current_criterion_type,
