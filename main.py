@@ -22,7 +22,12 @@ def add_zeros(data):
 def train(data_loader, model, optimizer, criterion, device, save_checkpoints, checkpoint_path, current_epoch):
     model.train()
     total_loss = 0
-    for data in tqdm(data_loader, desc="Iterating training graphs", unit="batch"):
+    correct = 0
+    total = 0
+    all_preds = []
+    all_labels = []
+    
+    for data in tqdm(data_loader, desc="TRAINING -->", unit="batch"):
         data = data.to(device)
         optimizer.zero_grad()
         output = model(data)
@@ -31,21 +36,38 @@ def train(data_loader, model, optimizer, criterion, device, save_checkpoints, ch
         optimizer.step()
         total_loss += loss.item()
 
+        ## Calculate predictions and accuracy 
+        pred = output.argmax(dim=1)
+        all_preds.extend(pred.cpu().numpy())
+        all_labels.extend(data.y.cpu().numpy())
+        correct += (pred == data.y).sum().item()
+        total += data.y.size(0)
+
+    accuracy = correct / total
+    f1 = f1_score(all_labels, all_preds, average="macro")
+
+
+
     # Save checkpoints if required
     if save_checkpoints:
         checkpoint_file = f"{checkpoint_path}_epoch_{current_epoch + 1}.pth"
         torch.save(model.state_dict(), checkpoint_file)
         print(f"Checkpoint saved at {checkpoint_file}")
 
-    return total_loss / len(data_loader)
+    avg_loss = total_loss / len(data_loader)
+    return avg_loss, accuracy, f1
 
+##############################
+##       EVALUATION         ##
+##############################
+## Returns predictions and optionally accuracy
 def evaluate(data_loader, model, device, calculate_accuracy=False):
     model.eval()
     correct = 0
     total = 0
     predictions = []
     with torch.no_grad():
-        for data in tqdm(data_loader, desc="Iterating eval graphs", unit="batch"):
+        for data in tqdm(data_loader, desc="EVALUATION -->", unit="batch"):
             data = data.to(device)
             output = model(data)
             pred = output.argmax(dim=1)
@@ -57,6 +79,41 @@ def evaluate(data_loader, model, device, calculate_accuracy=False):
         accuracy = correct / total
         return accuracy, predictions
     return predictions
+
+
+## Returns accuracy and average loss
+from sklearn.metrics import f1_score
+
+def evaluateTwo(data_loader, model, device, criterion):
+    model.eval()
+    correct = 0
+    total = 0
+    total_loss = 0
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for data in tqdm(data_loader, desc="Evaluation...", unit="batch"):
+            data = data.to(device)
+            output = model(data)
+            loss = criterion(output, data.y)
+            total_loss += loss.item()
+
+            pred = output.argmax(dim=1)
+            all_preds.extend(pred.cpu().numpy())
+            all_labels.extend(data.y.cpu().numpy())
+            correct += (pred == data.y).sum().item()
+            total += data.y.size(0)
+
+    accuracy = correct / total
+    avg_loss = total_loss / len(data_loader)
+    f1 = f1_score(all_labels, all_preds, average="macro")
+
+    return accuracy, avg_loss, f1
+
+##############################
+##############################
+##############################
 
 def save_predictions(predictions, test_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -171,9 +228,6 @@ def main(args):
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False) # TestSet to be labelled
     print("-------- Datasets loaded --------")
 
-
-
-    
     # Split dataset: 80% train, 20% validation
     train_size = int(0.8 * len(train_dataset))
     valid_size = len(train_dataset) - train_size
@@ -183,8 +237,8 @@ def main(args):
     train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True)
     valid_loader = DataLoader(valid_subset, batch_size=args.batch_size, shuffle=False)
 
-
-
+    #####################################
+    #####################################
 
 
 
@@ -211,27 +265,28 @@ def main(args):
         else:
             checkpoint_intervals = [num_epochs]
 
+            
         for epoch in range(num_epochs):
-            train_loss = train(
+            train_loss, train_acc, train_f1 = train(
                 train_loader, model, optimizer, criterion, device,
                 save_checkpoints=(epoch + 1 in checkpoint_intervals),
                 checkpoint_path=os.path.join(checkpoints_folder, f"model_{test_dir_name}"),
                 current_epoch=epoch
             )
-            train_acc, _ = evaluate(train_loader, model, device, calculate_accuracy=True)
-            valid_acc, _ = evaluate(valid_loader, model, device, calculate_accuracy=True)
-
-            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
             
-            # TRAINING EVALUATION
+            
+            # EVALUATION
+            valid_acc, valid_loss, valid_f1 = evaluateTwo(valid_loader, model, device, criterion = criterion)
+
+            #print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            
+            # Stacking losses and accuracies for plotting
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
-            
-            ## VALIDATION EVALUATION
-            #valid_losses.append(valid_loss)
+            valid_losses.append(valid_loss)
             valid_accuracies.append(valid_acc)
             
-            logging.info(f"Epoch {epoch + 1}/{num_epochs} | T-Loss: {train_loss:.4f} | T-Acc: {train_acc:.4f} V-Loss:  |V-Acc: {valid_acc:.4f}| T-f1: | V-f1: " )
+            logging.info(f"|Epoch {epoch + 1}/{num_epochs} | T-Loss: {train_loss:.4f} | T-Acc: {train_acc:.4f} V-Loss: {valid_loss:.4f} |V-Acc: {valid_acc:.4f}| T-f1: {train_f1:.4f} | V-f1: {valid_f1:.4f} " )
 
             # Save best model
             if train_acc > best_accuracy:
