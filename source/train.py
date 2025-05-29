@@ -45,7 +45,7 @@ def train_epoch(
         true_labels_int = data_batch.y.to(device) # (N,)
 
         # --- Forward pass del modello ---
-        output_logits, graph_embeddings, _ = model(data_batch) # (N, C), (N, emb_dim)
+        output_logits = model(data_batch) # (N, C), (N, emb_dim)
 
         # --- Calcolo Loss e Backward pass ---
         current_batch_loss_for_display = 0.0

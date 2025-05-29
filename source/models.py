@@ -321,4 +321,4 @@ class GINENet(nn.Module):
             return torch.zeros((num_graphs_in_batch, self.output_mlp[-1].out_features), device=edge_index.device if edge_index is not None else 'cpu')
 
         out_logits = self.output_mlp(x_pooled)
-        return out_logits, None, None
+        return out_logits
