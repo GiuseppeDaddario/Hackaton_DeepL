@@ -40,17 +40,20 @@ def train_epoch(
         effective_criterion_type = "ce_boost" # Usa CE standard per il boosting
 
 
+    # In source/train.py
+
+    # ... (altri import e inizio funzione train_epoch) ...
+
     for batch_idx, data_batch in enumerate(tqdm(loader, desc=f"Epoch {current_epoch+1} Training", unit="batch", leave=False)):
         data_batch = data_batch.to(device)
-        true_labels_int = data_batch.y.to(device) # (N,)
+        true_labels_int = data_batch.y.to(device)
 
         # --- Forward pass del modello ---
-        if criterion_type == "gcod":
-            model_output = model(data_batch)
-            output_logits = model_output[0] if isinstance(model_output, tuple) else model_output
-            graph_embeddings = model_output[1] if isinstance(model_output, tuple) and len(model_output) > 1 else None
-        else:
-            output_logits = model(data_batch) # (N, C), (N, emb_dim)
+        model_output_tuple = model(data_batch) # model_output_tuple è (logits, embeddings)
+
+        # Estrai SEMPRE i logits e gli embeddings dal tuple
+        actual_logits = model_output_tuple[0]
+        graph_embeddings = model_output_tuple[1] # Necessario per GCOD
 
         # --- Calcolo Loss e Backward pass ---
         current_batch_loss_for_display = 0.0
@@ -58,10 +61,12 @@ def train_epoch(
         if effective_criterion_type == "ce" or effective_criterion_type == "ce_boost":
             optimizer_model.zero_grad()
             if effective_criterion_type == "ce_boost":
-                loss_ce_boost = F.cross_entropy(output_logits, true_labels_int) # Semplice CE per boost
+                # USA actual_logits (il tensore)
+                loss_ce_boost = F.cross_entropy(actual_logits, true_labels_int)
                 loss_val = loss_ce_boost
             else: # "ce" normale
-                loss_val = criterion_obj(output_logits, true_labels_int)
+                # USA actual_logits (il tensore)
+                loss_val = criterion_obj(actual_logits, true_labels_int) # criterion_obj è LabelSmoothingCrossEntropy
 
             loss_val.backward()
             if gradient_clipping_norm > 0:
@@ -69,7 +74,7 @@ def train_epoch(
             optimizer_model.step()
             current_batch_loss_for_display = loss_val.item()
 
-        elif criterion_type == "gcod":
+        elif criterion_type == "gcod": # "effective_criterion_type" qui sarà "gcod"
             if not hasattr(data_batch, 'original_idx'):
                 raise ValueError("Per GCOD, 'original_idx' deve essere presente nel batch.")
             batch_original_indices = data_batch.original_idx.view(-1).tolist()
@@ -77,9 +82,9 @@ def train_epoch(
 
             l1_val, l2_val, l3_val = criterion_obj.calculate_loss_components(
                 batch_original_indices=batch_original_indices,
-                gnn_logits_batch=output_logits,
+                gnn_logits_batch=actual_logits, # USA actual_logits (il tensore)
                 true_labels_batch_one_hot=true_labels_one_hot,
-                gnn_embeddings_batch=graph_embeddings,
+                gnn_embeddings_batch=graph_embeddings, # USA graph_embeddings (il tensore)
                 batch_iter_num=batch_idx,
                 current_epoch=current_epoch,
                 atrain_overall_accuracy=atrain_global_value
