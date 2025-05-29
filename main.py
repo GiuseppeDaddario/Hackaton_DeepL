@@ -230,7 +230,7 @@ def main(args, full_train_dataset=None, train_loader=None, val_loader=None):
                 current_epoch_for_gcod=epoch, atrain_for_gcod=atrain_global, is_validation=True
             )
             val_losses_history.append(avg_val_loss)
-            val_f1_history.append(val_f1 * 100)
+            val_f1_history.append(val_f1)
             val_accuracy_history.append(val_acc)
 
 
