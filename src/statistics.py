@@ -40,7 +40,7 @@ def evaluateTwo(data_loader, model, device, criterion):
     all_labels = []
 
     with torch.no_grad():
-        for data in tqdm(data_loader, desc="Evaluation...", unit="batch"):
+        for data in tqdm(data_loader, desc="Evaluation -->", unit="batch"):
             data = data.to(device)
             output = model(data)
             loss = criterion(output, data.y)
