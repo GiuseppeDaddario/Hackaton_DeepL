@@ -196,5 +196,83 @@ class GNN(torch.nn.Module):
         final_logits = self.graph_pred_linear(graph_emb)
 
         return final_logits, graph_emb, h_node
-    
 
+
+# source/model.py
+import torch
+import torch.nn.functional as F
+from torch.nn import Sequential, Linear, ReLU, BatchNorm1d
+from torch_geometric.nn import GINEConv, global_add_pool, global_mean_pool
+
+class GINENet(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
+                 edge_dim, train_eps=True, dropout_rate=0.5):
+        """
+        Args:
+            in_channels (int): Dimensione delle feature dei nodi in input.
+                               Se usi AddNodeFeatures(node_feature_dim=1), questo sarà 1.
+            hidden_channels (int): Dimensione degli embedding intermedi.
+            out_channels (int): Numero di classi per la classificazione.
+            num_layers (int): Numero di layer GINEConv.
+            edge_dim (int): Dimensione delle feature degli archi.
+            train_eps (bool): Se rendere epsilon apprendibile.
+            dropout_rate (float): Tasso di dropout.
+        """
+        super().__init__()
+        self.in_channels = in_channels
+        self.hidden_channels = hidden_channels
+        self.out_channels = out_channels
+        self.num_layers = num_layers
+        self.edge_dim = edge_dim
+        self.train_eps = train_eps
+        self.dropout_rate = dropout_rate
+
+        self.convs = torch.nn.ModuleList()
+        self.bns = torch.nn.ModuleList() # Batch Normalization
+
+        self.node_encoder = Linear(in_channels, hidden_channels)
+
+        for _ in range(num_layers):
+            mlp = Sequential(
+                Linear(hidden_channels, 2 * hidden_channels), # Esempio di MLP
+                ReLU(),
+                Linear(2 * hidden_channels, hidden_channels)
+            )
+            conv = GINEConv(nn=mlp, train_eps=self.train_eps, edge_dim=self.edge_dim)
+            self.convs.append(conv)
+            self.bns.append(BatchNorm1d(hidden_channels))
+
+        # Layer di classificazione
+        self.lin_out = Linear(hidden_channels, out_channels)
+
+    def forward(self, x, edge_index, edge_attr, batch):
+        """
+        Args:
+            x (Tensor): Feature dei nodi [num_nodes, in_channels]
+            edge_index (LongTensor): Connettività del grafo [2, num_edges]
+            edge_attr (Tensor): Feature degli archi [num_edges, edge_dim]
+            batch (LongTensor): Assegnazione dei nodi ai grafi nel batch [num_nodes]
+        """
+        # 1. Codifica iniziale dei nodi
+        x = self.node_encoder(x) # [num_nodes, hidden_channels]
+
+        # 2. Layer GINEConv
+        for conv, bn in zip(self.convs, self.bns):
+            x_residual = x
+            x = conv(x, edge_index, edge_attr=edge_attr)
+            x = bn(x)
+            x = F.relu(x)
+            x = x + x_residual
+
+        # 3. Readout (aggregazione a livello di grafo)
+        x_graph = global_add_pool(x, batch) # [num_graphs_in_batch, hidden_channels]
+
+
+        # 4. Dropout e classificazione
+        x_graph = F.dropout(x_graph, p=self.dropout_rate, training=self.training)
+        out = self.lin_out(x_graph) # [num_graphs_in_batch, out_channels]
+
+        # Di solito per la classificazione con CrossEntropyLoss non serve il log_softmax qui,
+        # ma dipende dalla tua loss function.
+        # return F.log_softmax(out, dim=-1)
+        return out
