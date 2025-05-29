@@ -130,4 +130,4 @@ def evaluate_model(
         else:
             print("Warning: Nessun campione o etichetta valida per calcolare le metriche di validazione.")
 
-    return avg_loss_value, accuracy_value, f1_value, all_preds_list, all_labels_list
+    return avg_loss_value, accuracy_value, f1_value
