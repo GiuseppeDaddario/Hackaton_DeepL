@@ -60,7 +60,6 @@ def evaluateTwo(data_loader, model, device, criterion):
 
 ##############################
 ##############################
-##############################
 
 
 
@@ -68,6 +67,13 @@ def evaluateTwo(data_loader, model, device, criterion):
 
 
 
+
+
+
+
+#####################################
+##     Saving Predictions to CSV   ##
+#####################################
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -77,7 +83,7 @@ import os
 def save_predictions(predictions, test_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     submission_folder = os.path.join(script_dir, "submission")
-    test_dir_name = os.path.basename(os.path.dirname(test_path))
+    test_dir_name = os.path.basename(os.path.dirname(test_path)) #Extracts: A/B/C/D
     
     os.makedirs(submission_folder, exist_ok=True)
     
@@ -91,6 +97,20 @@ def save_predictions(predictions, test_path):
     
     output_df.to_csv(output_csv_path, index=False)
     print(f"Predictions saved to {output_csv_path}")
+
+##################################
+##################################
+
+
+
+
+
+
+
+
+##################################
+### Plotting Training Progress ###
+##################################
 
 
 def plot_training_progress(train_losses, train_accuracies, output_dir):
@@ -116,3 +136,7 @@ def plot_training_progress(train_losses, train_accuracies, output_dir):
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "training_progress.png"))
     plt.close()
+
+
+##################################
+##################################
