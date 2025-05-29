@@ -161,6 +161,8 @@ class GNN_node(torch.nn.Module):
                 self.convs.append(GCNConv(emb_dim))
             elif gnn_type == 'gine':
                 self.convs.append(GINEConv(emb_dim))
+            elif gnn_type == 'gineTransformer':
+                self.convs.append(GINETransformerNet(num_layer, emb_dim))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
 
@@ -242,6 +244,8 @@ class GNN_node_Virtualnode(torch.nn.Module):
                 self.convs.append(GCNConv(emb_dim))
             elif gnn_type == 'gine':
                 self.convs.append(GINEConv(emb_dim))
+            elif gnn_type == 'gineTransformer':
+                self.convs.append(GINETransformerNet(num_layer, emb_dim))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
 
@@ -304,7 +308,7 @@ class GNN_node_Virtualnode(torch.nn.Module):
 
 
 #####################################
-### TRANSFORMER
+###       GINE + TRANSFORMER     ####
 #####################################
 
 from torch.nn import TransformerEncoder, TransformerEncoderLayer

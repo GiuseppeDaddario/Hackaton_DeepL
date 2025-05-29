@@ -112,12 +112,21 @@ def main(args):
         model = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
     elif args.gnn == 'gin-virtual':
         model = GNN(gnn_type = 'gin', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+    
     elif args.gnn == 'gcn':
         model = GNN(gnn_type = 'gcn', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
     elif args.gnn == 'gcn-virtual':
         model = GNN(gnn_type = 'gcn', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+    
     elif args.gnn == 'gine':
+        model = GNN(gnn_type = 'gine', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = False).to(device)
+    elif args.gnn == 'gine-virtual':
         model = GNN(gnn_type = 'gine', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
+    
+    elif args.gnn == 'gineTransformer':
+        model = GNN(gnn_type = 'gineTransformer', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, ff_dim = args.ff_dim, residual = args.residual, num_heads = args.num_heads, virtual_node = False).to(device)
+    elif args.gnn == 'gineTrans-virtual':
+        model = GNN(gnn_type = 'gineTransformer', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, ff_dim = args.ff_dim ,residual = args.residual, num_heads = args.num_heads, virtual_node = True).to(device)
     else:
         raise ValueError('Invalid GNN type')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -178,7 +187,7 @@ def main(args):
             # Save logs for training progress
             train_losses.append(train_loss)
             train_accuracies.append(train_acc)
-            logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+            logging.info(f"Epoch {epoch + 1}/{num_epochs} | T-Loss: {train_loss:.4f} | T-Acc: {train_acc:.4f} V-Loss: |V-Acc: | T-f1: | V-f1: " )
 
             # Save best model
             if train_acc > best_accuracy:
@@ -202,14 +211,25 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
     parser.add_argument("--train_path", type=str, default=TRAIN_PATH, help="Path to the training dataset (optional).")
     parser.add_argument("--test_path", type=str, default=TEST_PATH, help="Path to the test dataset.")
+    
+    ## GENERIC
     parser.add_argument("--num_checkpoints", type=int, help="Number of checkpoints to save during training.")
+    parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
+    parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 10)')
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
+    
+    ## GNN-specific parameters
     parser.add_argument('--gnn', type=str, default='gine', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')
     parser.add_argument('--drop_ratio', type=float, default=0.5, help='dropout ratio (default: 0.5)')
     parser.add_argument('--num_layer', type=int, default=3, help='number of GNN message passing layers (default: 5)')
     parser.add_argument('--emb_dim', type=int, default=128, help='dimensionality of hidden units in GNNs (default: 300)')
-    parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
-    parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train (default: 10)')
+    parser.add_argument('--residual', action='store_true', help='Use residual connections in GNN layers')
     
+    # Transformer-specific parameters
+    parser.add_argument('--num_heads', type=int, default=4, help='Number of attention heads in Transformer (default: 4)')
+    parser.add_argument('--ff_dim', type=int, default=256, help='Dimensionality of feedforward layer in Transformer (default: 256)')
+
+
+
     args = parser.parse_args()
     main(args)
