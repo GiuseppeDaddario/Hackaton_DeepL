@@ -315,7 +315,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--num_checkpoints", type=int, default=5, help="Number of checkpoints to save during training (default: 5). Set to 0 to disable.")
     # Model Architecture
-    parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
+    parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer','gine'], help='GNN architecture type (default: transformer)')
     parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN message passing layers (default: 3)')
     parser.add_argument('--emb_dim', type=int, default=204, help='Dimensionality of hidden units in GNNs (default: 128)')
     parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio (default: 0.1)')
