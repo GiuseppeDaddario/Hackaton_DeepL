@@ -13,11 +13,11 @@ from source.statistics import save_predictions
 TRAIN_PATH = "../datasets/B/train.json.gz"   # <-- path al dataset completo
 TEST_PATH = "../datasets/B/test.json.gz"     # <-- path al test set
 BATCH_SIZE = 32
-NUM_EPOCHS = 5
+NUM_EPOCHS = 10
 LR = 0.001
-EMB_DIM = 64
-NUM_LAYERS = 3
-NUM_CLASSES = 7
+EMB_DIM = 300
+NUM_LAYERS = 5
+NUM_CLASSES = 6
 NOISE_RATE = 0.2  # 20% di label noise
 SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -87,6 +87,7 @@ def train(model, loader, optimizer, criterion):
         pred = out.argmax(dim=1)
         correct += (pred == data.y).sum().item()
         total += data.num_graphs
+        #print(pred, data.y)
     return total_loss / total, correct / total
 
 @torch.no_grad()

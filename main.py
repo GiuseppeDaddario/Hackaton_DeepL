@@ -317,7 +317,7 @@ if __name__ == "__main__":
     # Model Architecture
     parser.add_argument('--gnn_type', type=str, default='transformer', choices=['transformer'], help='GNN architecture type (default: transformer)')
     parser.add_argument('--num_layer', type=int, default=2, help='Number of GNN message passing layers (default: 3)')
-    parser.add_argument('--emb_dim', type=int, default=96, help='Dimensionality of hidden units in GNNs (default: 128)')
+    parser.add_argument('--emb_dim', type=int, default=80, help='Dimensionality of hidden units in GNNs (default: 128)')
     parser.add_argument('--drop_ratio', type=float, default=0.05, help='Dropout ratio (default: 0.1)')
     parser.add_argument('--transformer_heads', type=int, default=1, help='Number of attention heads for TransformerConv (default: 4)')
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (default: 7, VERIFY FROM DATASET)')
@@ -326,15 +326,15 @@ if __name__ == "__main__":
     parser.add_argument('--no_residual', action='store_true', help='Disable residual connections in GNN layers.')
 
     # Training Hyperparameters
-    parser.add_argument('--epochs', type=int, default=150, help='Number of epochs to train (default: 100)')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train (default: 100)')
     parser.add_argument('--batch_size', type=int, default=32, help='Input batch size for training (default: 32)')
-    parser.add_argument('--lr_model', type=float, default=1e-3, help='Learning rate for the GNN model (default: 0.001)')
+    parser.add_argument('--lr_model', type=float, default=2e-3, help='Learning rate for the GNN model (default: 0.001)')
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay (L2 penalty) for AdamW (default: 1e-5)')
     parser.add_argument('--gradient_clipping', type=float, default=1.0, help='Max norm for gradient clipping (0 to disable, default: 1.0)')
-    parser.add_argument('--val_split_ratio', type=float, default=0.15, help='Fraction of training data to use for validation (default: 0.15)')
+    parser.add_argument('--val_split_ratio', type=float, default=0.10, help='Fraction of training data to use for validation (default: 0.15)')
 
     # Loss Function and GCOD specific
-    parser.add_argument("--criterion", type=str, default="gcod", choices=["ce", "gcod"], help="Type of loss to use (default: ce)")
+    parser.add_argument("--criterion", type=str, default="ce", choices=["ce", "gcod"], help="Type of loss to use (default: ce)")
     parser.add_argument('--label_smoothing', type=float, default=0.1, help='Amount of label smoothing for CE loss (default: 0.1, use 0 for no smoothing)')
     parser.add_argument("--lr_u", type=float, default=0.01, help="Learning rate for 'u' parameters in GCOD (default: 0.01)")
     parser.add_argument("--lambda_l3_weight", type=float, default=0.7, help="Weight for L3 component in GCOD loss (default: 0.7)")
