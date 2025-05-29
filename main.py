@@ -16,7 +16,7 @@ from source.train import train_epoch
 from source.loadData import GraphDataset
 from source.loss import gcodLoss, LabelSmoothingCrossEntropy
 # from source.models import GNN # Rimosso se usi solo GINE, o modificato se GINENet è lì
-from source.models import GNN,GINENet # Assumendo GINENet in source/model.py
+from source.models import GNN, GINENetWithTransformer # Assumendo GINENet in source/model.py
 from source.dataLoader import AddNodeFeatures # Per creare feature dei nodi
 from source.utils import set_seed
 
@@ -109,14 +109,18 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
     # --- Costruzione Modello ---
     logging.info(">>> Building the model...")
     if args.gnn_type == 'gine':
-        model = GINENet(
-            in_channels=num_node_features_initial,
+        model = GINENetWithTransformer(
+            in_channels=node_feat_dim_initial,
             hidden_channels=args.emb_dim,
             out_channels=num_dataset_classes,
-            num_layers=args.num_layer,
+            num_gin_layers=args.num_layer, # Numero di layer GIN
             edge_dim=num_edge_features_resolved,
-            train_eps=True, # Puoi renderlo un argomento del parser se necessario
-            dropout_rate=args.drop_ratio # Passa il tipo di pooling
+            dropout_rate=args.drop_ratio,
+            graph_pooling=args.graph_pooling,
+            # Parametri del Transformer
+            num_transformer_layers=args.transformer_layers, # Es. 2
+            transformer_nhead=args.transformer_heads,           # Es. 4 (deve dividere emb_dim)
+            transformer_dim_feedforward=(args.emb_dim * 2)
         ).to(device)
     elif args.gnn_type == 'transformer':
         model = GNN(
@@ -440,7 +444,8 @@ if __name__ == "__main__":
     parser.add_argument('--num_layer', type=int, default=3, help='Number of GNN layers.')
     parser.add_argument('--emb_dim', type=int, default=128, help='Dimensionality of hidden units.') # Era 204, standardizzato a 128
     parser.add_argument('--drop_ratio', type=float, default=0.1, help='Dropout ratio.')
-    parser.add_argument('--transformer_heads', type=int, default=4, help='Num heads for TransformerConv.') # Specifico per Transformer
+    parser.add_argument('--transformer_heads', type=int, default=4, help='Num heads for TransformerConv.')
+    parser.add_argument('--transformer_layers', type=int, default=4, help='Num heads for TransformerConv.')# Specifico per Transformer
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (used if not inferred).')
     parser.add_argument('--jk_mode', type=str, default="last", help="Jumping Knowledge mode.") # Non per GINE base
     parser.add_argument('--graph_pooling', type=str, default="add", choices=["sum", "mean", "max", "add"], help="Graph pooling method for GINE.") # "attention", "set2set" rimossi perché non in GINE base
