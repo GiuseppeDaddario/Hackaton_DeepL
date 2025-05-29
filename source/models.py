@@ -4,6 +4,10 @@ from torch_geometric.nn import TransformerConv, \
     global_mean_pool, GINEConv
 import torch.nn.functional as F
 
+import torch.nn as nn
+from torch_geometric.nn import GINEConv, global_mean_pool, global_add_pool, BatchNorm
+from torch_geometric.data import Data, DataLoader # Per creare dati di esempio
+
 # Nuovo Blocco Transformer Convoluzionale
 class TransformerConvBlock(torch.nn.Module):
     def __init__(self, emb_dim, num_heads=4, dropout_ratio=0.1, concat=True):
@@ -197,82 +201,112 @@ class GNN(torch.nn.Module):
 
         return final_logits, graph_emb, h_node
 
-
-# source/model.py
-import torch
-import torch.nn.functional as F
-from torch.nn import Sequential, Linear, ReLU, BatchNorm1d
-from torch_geometric.nn import GINEConv, global_add_pool, global_mean_pool
-
-class GINENet(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers,
-                 edge_dim, train_eps=True, dropout_rate=0.5):
-        """
-        Args:
-            in_channels (int): Dimensione delle feature dei nodi in input.
-                               Se usi AddNodeFeatures(node_feature_dim=1), questo sarà 1.
-            hidden_channels (int): Dimensione degli embedding intermedi.
-            out_channels (int): Numero di classi per la classificazione.
-            num_layers (int): Numero di layer GINEConv.
-            edge_dim (int): Dimensione delle feature degli archi.
-            train_eps (bool): Se rendere epsilon apprendibile.
-            dropout_rate (float): Tasso di dropout.
-        """
+# Blocco Encoder GIN con connessione residuale, BatchNorm, ReLU, Dropout
+class GINEncoderBlock(nn.Module):
+    def __init__(self, hidden_dim, dropout_rate):
         super().__init__()
-        self.in_channels = in_channels
-        self.hidden_channels = hidden_channels
-        self.out_channels = out_channels
-        self.num_layers = num_layers
-        self.edge_dim = edge_dim
-        self.train_eps = train_eps
+        # MLP per GINEConv
+        mlp = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim * 2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim * 2, hidden_dim)
+        )
+        self.conv = GINEConv(mlp, train_eps=True, edge_dim=hidden_dim) # edge_dim specificato
+        self.norm = BatchNorm(hidden_dim) # BatchNorm da PyG
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, x, edge_index, edge_attr):
+        x_residual = x # Salva l'input per la connessione residuale
+
+        x_conv = self.conv(x, edge_index, edge_attr=edge_attr)
+
+        x_norm = self.norm(x_conv)
+        x_relu = self.relu(x_norm)
+        x_drop = self.dropout(x_relu)
+
+        return x_drop + x_residual
+
+class GINENet(nn.Module):
+    def __init__(self, node_in_dim, edge_in_dim, hidden_dim, out_dim,
+                 num_gnn_layers, num_transformer_layers, nhead_transformer,
+                 dim_feedforward_transformer, dropout_rate, pool_type='mean'):
+        super().__init__()
+
+        self.hidden_dim = hidden_dim
         self.dropout_rate = dropout_rate
 
-        self.convs = torch.nn.ModuleList()
-        self.bns = torch.nn.ModuleList() # Batch Normalization
+        # 1. Embedding Iniziali per Node e Edge Features
+        self.node_emb = nn.Linear(node_in_dim, hidden_dim)
+        if edge_in_dim > 0:
+            self.edge_emb = nn.Linear(edge_in_dim, hidden_dim) # Edge features embeddate alla stessa hidden_dim
+        else:
+            self.edge_emb = None # Nessun attributo sugli archi
 
-        self.node_encoder = Linear(in_channels, hidden_channels)
+        # 2. GNN Layers (Encoder Residuali con GINEConv)
+        self.gnn_layers = nn.ModuleList()
+        for _ in range(num_gnn_layers):
+            self.gnn_layers.append(GINEncoderBlock(hidden_dim, dropout_rate))
 
-        for _ in range(num_layers):
-            mlp = Sequential(
-                Linear(hidden_channels, 2 * hidden_channels), # Esempio di MLP
-                ReLU(),
-                Linear(2 * hidden_channels, hidden_channels)
+        # 3. Transformer Encoder Layers (opzionale)
+        if num_transformer_layers > 0:
+            transformer_encoder_layer = nn.TransformerEncoderLayer(
+                d_model=hidden_dim, # Dimensione dell'input
+                nhead=nhead_transformer, # Numero di "attention heads"
+                dim_feedforward=dim_feedforward_transformer, # Dimensione del layer feedforward nel transformer
+                dropout=dropout_rate,
+                activation='relu',
+                batch_first=True # Aspetta input (batch, seq_len, features)
             )
-            conv = GINEConv(nn=mlp, train_eps=self.train_eps, edge_dim=self.edge_dim)
-            self.convs.append(conv)
-            self.bns.append(BatchNorm1d(hidden_channels))
+            self.transformer_encoder = nn.TransformerEncoder(
+                transformer_encoder_layer,
+                num_layers=num_transformer_layers
+            )
+        else:
+            self.transformer_encoder = None
 
-        # Layer di classificazione
-        self.lin_out = Linear(hidden_channels, out_channels)
+        # 4. Pooling Layer (per ottenere un embedding a livello di grafo)
+        if pool_type == 'mean':
+            self.pool = global_mean_pool
+        elif pool_type == 'add':
+            self.pool = global_add_pool
+        else:
+            raise ValueError(f"Unsupported pool_type: {pool_type}")
 
-    def forward(self, x, edge_index, edge_attr, batch):
-        """
-        Args:
-            x (Tensor): Feature dei nodi [num_nodes, in_channels]
-            edge_index (LongTensor): Connettività del grafo [2, num_edges]
-            edge_attr (Tensor): Feature degli archi [num_edges, edge_dim]
-            batch (LongTensor): Assegnazione dei nodi ai grafi nel batch [num_nodes]
-        """
-        # 1. Codifica iniziale dei nodi
-        x = self.node_encoder(x) # [num_nodes, hidden_channels]
+        # 5. Output MLP (Classificatore/Regressione)
+        self.output_mlp = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_dim // 2, out_dim)
+        )
 
-        # 2. Layer GINEConv
-        for conv, bn in zip(self.convs, self.bns):
-            x_residual = x
-            x = conv(x, edge_index, edge_attr=edge_attr)
-            x = bn(x)
-            x = F.relu(x)
-            x = x + x_residual
+    def forward(self, data):
+        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
 
-        # 3. Readout (aggregazione a livello di grafo)
-        x_graph = global_add_pool(x, batch) # [num_graphs_in_batch, hidden_channels]
+        # 1. Applica embedding iniziali
+        x = self.node_emb(x)
+        if self.edge_emb and edge_attr is not None:
+            edge_attr = self.edge_emb(edge_attr)
+        # Se edge_attr è None, GINEConv lo gestirà (considerando come se fossero feature nulle o costanti)
 
+        # 2. Passa attraverso i GNN Layers
+        for gnn_layer in self.gnn_layers:
+            x = gnn_layer(x, edge_index, edge_attr)
 
-        # 4. Dropout e classificazione
-        x_graph = F.dropout(x_graph, p=self.dropout_rate, training=self.training)
-        out = self.lin_out(x_graph) # [num_graphs_in_batch, out_channels]
+        # 3. Passa attraverso il Transformer Encoder (se presente)
+        if self.transformer_encoder:
 
-        # Di solito per la classificazione con CrossEntropyLoss non serve il log_softmax qui,
-        # ma dipende dalla tua loss function.
-        # return F.log_softmax(out, dim=-1)
+            x_transformed = x.unsqueeze(0) # -> [1, num_total_nodes, hidden_dim]
+            x_transformed = self.transformer_encoder(x_transformed)
+            x = x_transformed.squeeze(0) # -> [num_total_nodes, hidden_dim]
+
+        if batch is not None:
+            x_pooled = self.pool(x, batch) # x_pooled ha forma [num_graphs, hidden_dim]
+        else:
+            x_pooled = x
+
+        # 5. Passa attraverso l'Output MLP
+        out = self.output_mlp(x_pooled)
+
         return out
