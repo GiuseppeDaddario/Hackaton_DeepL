@@ -91,32 +91,38 @@ class GNN_node(torch.nn.Module):
 
         x = x.long().clamp(min=0, max=self.node_encoder.num_embeddings - 1)
         x = x.to(self.node_encoder.weight.device)
-        h_list = [self.node_encoder(x)]
+
+        initial_node_emb = self.node_encoder(x)
+        if initial_node_emb.ndim == 3 and initial_node_emb.size(1) == 1:
+            initial_node_emb = initial_node_emb.squeeze(1)
+        h_list = [initial_node_emb]
 
         edge_embedding = self.edge_encoder(edge_attr)
 
         for layer in range(self.num_layer):
-            h_prev_layer = h_list[layer]
+            h_input_layer = h_list[layer]
 
             if self.gnn_type == 'transformer':
-                h = self.convs[layer](h_prev_layer, edge_index, edge_embedding)
+                h_output_conv = self.convs[layer](h_input_layer, edge_index, edge_embedding)
             elif self.gnn_type == 'gine':
-                h = self.convs[layer](h_prev_layer, edge_index, edge_attr=edge_embedding)
+                h_output_conv = self.convs[layer](h_input_layer, edge_index, edge_attr=edge_embedding)
             else:
-                h = h_prev_layer
+                h_output_conv = h_input_layer
 
-            h = self.layer_norms[layer](h) # LayerNorm dopo il blocco convoluzionale
+            h_after_norm = self.layer_norms[layer](h_output_conv)
 
-            if layer < self.num_layer - 1: # Applica LeakyReLU e Dropout tranne all'ultimo layer
-                h = F.leaky_relu(h) # Spostato LeakyReLU dopo LayerNorm
-                h = F.dropout(h, self.drop_ratio, training=self.training)
-            else: # Dropout per l'ultimo layer (senza LeakyReLU)
-                h = F.dropout(h, self.drop_ratio, training=self.training)
+            if layer < self.num_layer - 1:
+                h_activated = F.leaky_relu(h_after_norm)
+                h_after_dropout = F.dropout(h_activated, self.drop_ratio, training=self.training)
+            else:
+                h_after_dropout = F.dropout(h_after_norm, self.drop_ratio, training=self.training)
 
-            if self.residual and layer < self.num_layer : # La connessione residuale si somma all'input del layer corrente
-                h = h + h_list[layer] # Aggiungi l'output del layer precedente (prima di passare per la conv corrente)
+            current_h = h_after_dropout
 
-            h_list.append(h)
+            if self.residual:
+                current_h = current_h + h_input_layer
+
+            h_list.append(current_h)
 
         if self.JK == "last":
             node_representation = h_list[-1]
@@ -125,10 +131,9 @@ class GNN_node(torch.nn.Module):
         elif self.JK == "mean":
             node_representation = torch.stack(h_list).mean(dim=0)
         else:
-            node_representation = h_list[-1] # Default a last
+            node_representation = h_list[-1]
 
         return node_representation
-
 class GNN(torch.nn.Module):
     def __init__(self, num_class, num_layer=5, emb_dim=300,
                  gnn_type='transformer', residual=True, drop_ratio=0.5, JK="last", graph_pooling="attention",
