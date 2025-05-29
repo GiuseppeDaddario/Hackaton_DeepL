@@ -50,13 +50,9 @@ def train_epoch(
         # --- Calcolo Loss e Backward pass ---
         current_batch_loss_for_display = 0.0
 
-        if effective_criterion_type == "ce" or effective_criterion_type == "ce_boost":
+        if effective_criterion_type == "ce" or effective_criterion_type == "sce" or effective_criterion_type == "gce":
             optimizer_model.zero_grad()
-            if effective_criterion_type == "ce_boost":
-                loss_ce_boost = F.cross_entropy(output_logits, true_labels_int) # Semplice CE per boost
-                loss_val = loss_ce_boost
-            else: # "ce" normale
-                loss_val = criterion_obj(output_logits, true_labels_int)
+            loss_val = criterion_obj(output_logits, true_labels_int)
 
             loss_val.backward()
             if gradient_clipping_norm > 0:
