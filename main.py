@@ -452,7 +452,7 @@ if __name__ == "__main__":
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight decay.')
     parser.add_argument('--gradient_clipping', type=float, default=1.0, help='Max norm for gradient clipping (0 to disable).')
     parser.add_argument('--val_split_ratio', type=float, default=0.15, help='Fraction for validation split.')
-    parser.add_argument('--early_stopping_patience', type=int, default=10, help='Patience for early stopping. 0 to disable.')
+    parser.add_argument('--early_stopping_patience', type=int, default=0, help='Patience for early stopping. 0 to disable.')
 
 
     parser.add_argument("--criterion", type=str, default="ce", choices=["ce", "gcod"], help="Loss function.") # Default a 'ce'

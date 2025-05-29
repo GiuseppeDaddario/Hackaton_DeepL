@@ -31,10 +31,12 @@ def evaluate_model(
             data_batch = data_batch.to(device)
 
             # Inference on the dataset
-            output_logits= model(data_batch) # (N, C), (N, emb_dim)
-            _, predicted_labels = torch.max(output_logits, 1) # (N,) # takes the max probable label.
-            
+            if criterion_type == "gcod":
+                output_logits, graph_embeddings, _ = model(data_batch) # (N, C), (N, emb_dim)
+            else:
+                output_logits = model(data_batch) # (N, C), (N, emb_dim)
 
+            _, predicted_labels = torch.max(output_logits, 1) # (N,) # takes the max probable label.
 
 
             # --- Logica specifica per la VALIDAZIONE (quando hai le etichette vere) ---
