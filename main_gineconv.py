@@ -130,8 +130,9 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
             hidden_channels=args.emb_dim,
             out_channels=num_dataset_classes,
             num_gin_layers=args.num_layer, # Numero di layer GIN
-            edge_dim=num_edge_features_resolved,
             emb_dim=args.emb_dim,
+            jk=args.jk,
+            edge_dim=num_edge_features_resolved,
             dropout_rate=args.drop_ratio,
             graph_pooling=args.graph_pooling,
             # Parametri del Transformer
@@ -464,7 +465,7 @@ if __name__ == "__main__":
     parser.add_argument('--transformer_heads', type=int, default=4, help='Num heads for TransformerConv.')
     parser.add_argument('--transformer_layers', type=int, default=1, help='Num heads for TransformerConv.')# Specifico per Transformer
     parser.add_argument('--num_edge_features', type=int, default=7, help='Dimensionality of edge features (used if not inferred).')
-    parser.add_argument('--jk_mode', type=str, default="last", help="Jumping Knowledge mode.") # Non per GINE base
+    parser.add_argument('--jk', type=str, default="last", choices=["last","concat","sum","max"], help="Jumping Knowledge mode.")
     parser.add_argument('--graph_pooling', type=str, default="add", choices=["sum", "mean", "max", "add"], help="Graph pooling method for GINE.") # "attention", "set2set" rimossi perché non in GINE base
     parser.add_argument('--no_residual', action='store_true', help='Disable residual connections.') # Non per GINE base
 
