@@ -139,14 +139,14 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
         ).to(device)
         logging.info(f"• Model architecture      : BaseGNN ({args.gnn_type})")
     elif args.gnn_type == 'newModel':
-        logging.info(f"Building uWuModel...")
+        logging.info(f"Building newModel...")
         model = newModel(
             emb_dim=args.emb_dim,
             edge_input_dim=num_edge_features_resolved,
             num_classes=num_dataset_classes,
             dropout=args.drop_ratio
         ).to(device)
-        logging.info(f"• Model architecture      : uWuModel")
+        logging.info(f"• Model architecture      : newModel")
         logging.info(f"• Using emb_dim           : {args.emb_dim}")
         logging.info(f"• Using drop_ratio        : {args.drop_ratio}")
     else:
