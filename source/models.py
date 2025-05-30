@@ -248,7 +248,7 @@ class GINEncoderBlock(nn.Module):
         return x_drop
 
 class GINENetWithTransformer(nn.Module): # Rinominata per chiarezza
-    def __init__(self, in_channels, hidden_channels, out_channels, num_gin_layers,
+    def __init__(self, in_channels, hidden_channels, out_channels, num_gin_layers, emb_dim, jk="last",
                  edge_dim=0, dropout_rate=0.5, graph_pooling="mean",
                  # Parametri per il Transformer
                  num_transformer_layers=0, # Metti > 0 per attivare il Transformer
@@ -259,7 +259,8 @@ class GINENetWithTransformer(nn.Module): # Rinominata per chiarezza
         self.num_gin_layers = num_gin_layers
         self.dropout_rate = dropout_rate
         self.graph_pooling_type = graph_pooling
-        self.hidden_channels = hidden_channels # Salva per il Transformer
+        self.hidden_channels = hidden_channels
+        self.jk = jk
 
         self.node_encoder = nn.Linear(in_channels, hidden_channels)
 
@@ -303,21 +304,36 @@ class GINENetWithTransformer(nn.Module): # Rinominata per chiarezza
             self.transformer_norm = None
             logging.info("GINENet: Transformer Encoder non attivo.")
 
-
+        # --- Graph Pooling ---
         if self.graph_pooling_type == "sum" or self.graph_pooling_type == "add":
             self.pool = global_add_pool
         elif self.graph_pooling_type == "mean":
             self.pool = global_mean_pool
         elif self.graph_pooling_type == "max":
             self.pool = global_max_pool
-        else:
-            raise ValueError(f"Unsupported graph pooling type: {self.graph_pooling_type}")
+        elif self.graph_pooling_type == "attention":
+            if self.graph_pooling_type == "attention":
+                gate_nn_in_dim = hidden_channels  # default
 
+                if jk == "concat":
+                    gate_nn_in_dim = hidden_channels * num_gin_layers
+
+                self.pool = GlobalAttention(gate_nn=torch.nn.Sequential(
+                    torch.nn.Linear(gate_nn_in_dim, 2 * gate_nn_in_dim),
+                    torch.nn.LayerNorm(2 * gate_nn_in_dim),
+                    torch.nn.LeakyReLU(),
+                    torch.nn.Dropout(0.2),
+                    torch.nn.Linear(2 * gate_nn_in_dim, 1)
+                ))
+        else:
+            raise ValueError("Invalid graph pooling type.")
+
+        out_mlp_in_dim = hidden_channels * num_gin_layers if jk == "concat" else hidden_channels
         self.output_mlp = nn.Sequential(
-            nn.Linear(hidden_channels, hidden_channels // 2),
+            nn.Linear(out_mlp_in_dim, out_mlp_in_dim // 2),
             nn.ReLU(),
             nn.Dropout(dropout_rate),
-            nn.Linear(hidden_channels // 2, out_channels)
+            nn.Linear(out_mlp_in_dim // 2, out_channels)
         )
 
     def forward(self, data):
@@ -336,51 +352,51 @@ class GINENetWithTransformer(nn.Module): # Rinominata per chiarezza
         x = F.relu(x)
         x = F.dropout(x, p=self.dropout_rate, training=self.training)
 
-        current_edge_attr = edge_attr
-        if self.edge_encoder and current_edge_attr is not None and current_edge_attr.numel() > 0:
-            current_edge_attr = self.edge_encoder(current_edge_attr)
+        if self.edge_encoder and edge_attr is not None and edge_attr.numel() > 0:
+            edge_attr = self.edge_encoder(edge_attr)
 
+        layer_outputs = []
         for conv_layer in self.gin_convs:
-            x = conv_layer(x, edge_index, current_edge_attr)
+            x = conv_layer(x, edge_index, edge_attr)
+            layer_outputs.append(x)
 
-        # --- Applicazione del Transformer Encoder (se attivo) ---
-            if self.transformer_encoder:
-                if batch is not None: # Se stiamo processando un batch di grafi
-                    x_dense, node_mask = to_dense_batch(x, batch, fill_value=0)
+            # --- Apply JK ---
+            if self.jk == "last":
+                x = layer_outputs[-1]
+            elif self.jk == "concat":
+                x = torch.cat(layer_outputs, dim=-1)
+            elif self.jk == "sum":
+                x = torch.stack(layer_outputs, dim=0).sum(dim=0)
+            elif self.jk == "max":
+                x = torch.stack(layer_outputs, dim=0).max(dim=0)[0]
+            else:
+                raise ValueError(f"Invalid JK mode: {self.jk}")
 
-                    if x_dense.numel() > 0: # Controlla se x_dense ha elementi
-                        src_key_padding_mask = ~node_mask
-                        transformer_output = self.transformer_encoder(x_dense, src_key_padding_mask=src_key_padding_mask)
-
-                        if self.transformer_norm:
-                            transformer_output = self.transformer_norm(transformer_output)
-
-                        x = transformer_output[node_mask]
-
-                elif x.numel() > 0 : # Se stiamo processando un singolo grafo (batch is None) e x non è vuoto
-                    # Applica il Transformer a un singolo grafo
-                    x_unsqueezed = x.unsqueeze(0) # Aggiunge la dimensione del batch fittizia -> [1, num_nodes, features]
-                    transformer_output = self.transformer_encoder(x_unsqueezed) # No src_key_padding_mask per singolo grafo senza padding
-
+        # --- Transformer Encoder ---
+        if self.transformer_encoder:
+            if batch is not None:
+                x_dense, node_mask = to_dense_batch(x, batch, fill_value=0)
+                if x_dense.numel() > 0:
+                    src_key_padding_mask = ~node_mask
+                    x = self.transformer_encoder(x_dense, src_key_padding_mask=src_key_padding_mask)
                     if self.transformer_norm:
-                        transformer_output = self.transformer_norm(transformer_output)
+                        x = self.transformer_norm(x)
+                    x = x[node_mask]
+            else:
+                if x.numel() > 0:
+                    x = self.transformer_encoder(x.unsqueeze(0))
+                    if self.transformer_norm:
+                        x = self.transformer_norm(x)
+                    x = x.squeeze(0)
 
-                    x = transformer_output.squeeze(0)
+        # --- Pooling ---
+        if batch is None:
+            batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
 
-        # --- Fine Sezione Transformer ---
-
-        current_batch_assignment = batch
-        if current_batch_assignment is None:
-            if x.numel() > 0:
-                current_batch_assignment = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
-
-        x_pooled = None
-        if x.numel() > 0 and current_batch_assignment is not None:
-            x_pooled = self.pool(x, current_batch_assignment)
-        elif x.numel() > 0 and current_batch_assignment is None:
-            x_pooled = x.mean(dim=0, keepdim=True)
-        else: # Caso di x vuoto già gestito all'inizio
-            logging.error("GINENet: x_pooled non calcolabile nonostante i controlli (x o batch problematici).")
+        if x.numel() > 0:
+            x_pooled = self.pool(x, batch)
+        else:
+            logging.error("GINENet: x_pooled non calcolabile.")
             num_graphs_in_batch = data.num_graphs if hasattr(data, 'num_graphs') else 1
             dummy_logits = torch.zeros((num_graphs_in_batch, self.output_mlp[-1].out_features), device=output_device)
             dummy_embeddings = torch.zeros((num_graphs_in_batch, self.hidden_channels), device=output_device)

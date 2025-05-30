@@ -131,6 +131,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
             out_channels=num_dataset_classes,
             num_gin_layers=args.num_layer, # Numero di layer GIN
             edge_dim=num_edge_features_resolved,
+            emb_dim=args.emb_dim,
             dropout_rate=args.drop_ratio,
             graph_pooling=args.graph_pooling,
             # Parametri del Transformer
