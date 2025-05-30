@@ -347,7 +347,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
 
             avg_val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0
             if val_loader:
-                avg_val_loss, val_acc, val_f1 = evaluate_model(
+                avg_val_loss, val_acc, val_f1, _, _ = evaluate_model(
                     model=model, loader=val_loader, device=device,
                     criterion_obj=current_criterion_obj, # Usa lo stesso criterion del training per consistenza
                     criterion_type=current_criterion_type,
