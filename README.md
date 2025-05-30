@@ -4,16 +4,33 @@
 
 ---
 
-This project implements a framework for graph classification tasks. It **features Graph Neural Network** (GNN) architectures, including **GNNtransformers** and the advanced loss function `GCOD`.  
+This project implements a framework for graph classification tasks. It features **Graph Neural Network** (GNN) architectures, including **GNNtransformers** and the advanced loss function `GCOD`.  
+
+
+# HERE GOES THE TEASER IMAGE
+
+## Models' details
 
 Two distinct strategies are proposed:
 
-* `GIN` model for C and D datasets
+* `GNN` model for C and D datasets
+    
 * `GINE + transformer` model for A and B datasets
+---
+*   **GNN [C,D Datasets]:**
+    * The core is the `TransformerConvBlock` which is a graph convolutional layer
+    * The GNN_node manages the message passing between nodes.
+    * **Dropout** is used to reduce overfitting by randomly deactivating neurons during training, preventing the model from relying too heavily on specific activations and improving generalization.
+    * **Residual Connections** help stabilize training by preserving the original input across layers, allowing gradients to flow better.
 
-
-
-
+*   **GINE + TRANSFORMER [A,B Datasets]:**
+    * A sequence of two **GINConvE** layers followed by batch normalization and LeakyReLU activation, capturing local neighborhood structures.
+    * A **TransformerConvE** layer with edge-aware attention mechanisms, capturing long-range dependencies across the graph. Includes residual connection and batch normalization.
+    * Another two-layer **GIN block** for refining node embeddings post-transformer.
+    * Mean pooling layer to aggregate node embeddings.
+    * A two-layer **MLP** with *LeakyReLU* and *Dropout*, mapping the graph embedding to the output classes.
+    * **Dropout** As before.
+    * **Residuals** As before.
 
 ## Overview of the Method
 
