@@ -32,24 +32,31 @@ def predict_with_model(args):
     print(f"  Number of Classes       : {num_dataset_classes}")
     print(f"  GIN Layers              : {args.num_layer}")
     print(f"  Embedding Dim           : {args.emb_dim}")
-    if args.num_transformer_layers > 0 : # Logga i parametri del Transformer solo se usati
-        print(f"  Transformer Layers      : {args.num_transformer_layers}")
-        print(f"  Transformer Heads       : {args.transformer_nhead}")
+    if args.transformer_layers > 0 : # Logga i parametri del Transformer solo se usati
+        print(f"  Transformer Layers      : {args.transformer_layers}")
+        print(f"  Transformer Heads       : {args.transformer_heads}")
+    print(f"  Dropout Rate            : {args.drop_ratio}")
+    print(f"  Graph Pooling           : {args.graph_pooling}")
+    print(f"  Residual Connections    : {'Yes' if not args.no_residual else 'No'}")
+    print(f"  Jumping Knowledge       : {args.jk}")
+
 
 
     print("Building the model...")
-    model = GINENetWithTransformer( # <--- MODIFICATO QUI
+    model = GINENetWithTransformer(
         in_channels=num_node_features_initial,
         hidden_channels=args.emb_dim,
         out_channels=num_dataset_classes,
-        num_gin_layers=args.num_layer,       # Numero di layer GIN
+        num_gin_layers=args.num_layer, # Numero di layer GIN
+        no_residual=args.no_residual,
+        jk=args.jk,
         edge_dim=num_edge_features_resolved,
         dropout_rate=args.drop_ratio,
         graph_pooling=args.graph_pooling,
         # Parametri del Transformer
-        num_transformer_layers=args.num_transformer_layers,
-        transformer_nhead=args.transformer_nhead,
-        transformer_dim_feedforward= 2 * args.emb_dim
+        num_transformer_layers=args.transformer_layers, # Es. 2
+        transformer_nhead=args.transformer_heads,           # Es. 4 (deve dividere emb_dim)
+        transformer_dim_feedforward=(args.emb_dim * 2)
     ).to(device)
     print("Model built.")
 
@@ -113,8 +120,8 @@ def predict_with_model(args):
     print(f"Generated {len(all_predictions)} predictions.")
 
     output_prediction_filename = f"predictions_{os.path.basename(args.test_path).replace('.json.gz', '')}_{args.gnn_type}"
-    if args.num_transformer_layers > 0: # Aggiungi info sul transformer al nome del file
-        output_prediction_filename += f"_tf{args.num_transformer_layers}"
+    if args.transformer_layers > 0: # Aggiungi info sul transformer al nome del file
+        output_prediction_filename += f"_tf{args.transformer_layers}"
     output_prediction_filename += ".txt"
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -131,26 +138,28 @@ if __name__ == "__main__":
     # per GINENetWithTransformer che corrispondono al modello addestrato.
     args = argparse.Namespace(
         # Path
-        checkpoint_path='/Users/giuseppedaddario/Desktop/DATASET_A_/checkpoints/model_A_best.pth', # << MODIFICA CON IL PATH AL TUO CHECKPOINT
+        checkpoint_path='/Users/giuseppedaddario/Downloads/checkpoints_Gcod/model_B_gine_best.pth', # << MODIFICA CON IL PATH AL TUO CHECKPOINT
         test_path='../datasets/A/test.json.gz',
         output_dir='/Users/giuseppedaddario/Desktop/submission', # << MODIFICA DIR OUTPUT
 
         # Architettura del modello (DEVE CORRISPONDERE AL CHECKPOINT)
         gnn_type='gine',
         num_layer=3,                                # Numero di layer GIN
-        emb_dim=64,
-        drop_ratio=0.2,                             # Valore usato nel training
-        graph_pooling='mean',
+        emb_dim=153,
+        drop_ratio=0.1,                             # Valore usato nel training
+        graph_pooling='attention',
         node_feat_dim_initial=1,
         num_edge_features_from_training=7,          # Valore usato nel training (es. 7 per dataset A, o 0)
         num_classes_from_training=6,                # Valore usato nel training (es. 6 per dataset A)
+        no_residual=False,                          # Se il modello addestrato ha residual connections
+        jk='last',                                  # Se il modello addestrato usa Jumping Knowledge (es. 'last' o 'cat')
 
         # Parametri del Transformer (DEVE CORRISPONDERE AL CHECKPOINT)
-        num_transformer_layers=1,                   # Es. 1 se il checkpoint ha 1 layer Transformer
-        transformer_nhead=2,                        # Es. 4 (se emb_dim=128, 128/4=32 OK)           # Es.
+        transformer_layers=1,                   # Es. 1 se il checkpoint ha 1 layer Transformer
+        transformer_heads=3,                        # Es. 4 (se emb_dim=128, 128/4=32 OK)           # Es.
 
         # Runtime
-        batch_size=64,
+        batch_size=32,
         device=0,
         seed=777,
         num_workers=0, # Su macOS spesso 0 è più stabile per PyG se non hai configurato bene il multiprocessing

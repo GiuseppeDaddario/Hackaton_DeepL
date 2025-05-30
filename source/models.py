@@ -1,12 +1,8 @@
-import logging  # Aggiunto per i warning interni
-
 # In source/models.py (questa è la versione che si aspetta 'in_channels', etc.)
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import GINEConv, global_mean_pool, global_add_pool, global_max_pool, BatchNorm
-from torch_geometric.nn import TransformerConv, \
-    GlobalAttention
+from torch.nn import Sequential, Linear, Dropout, LayerNorm, BatchNorm1d, LeakyReLU
+from torch_geometric.nn import GlobalAttention
+from torch_geometric.nn import MessagePassing, TransformerConv
 
 
 # Nuovo Blocco Transformer Convoluzionale
@@ -408,3 +404,183 @@ class GINENetWithTransformer(nn.Module): # Rinominata per chiarezza
 
         out_logits = self.output_mlp(x_pooled)
         return out_logits, x_pooled
+
+
+
+
+
+
+
+
+
+
+
+
+
+class GINConvE(MessagePassing):
+    def __init__(self, emb_dim, edge_input_dim=7, dropout_edge_mlp=0.2, dropout_out=0.2):
+        super().__init__(aggr="add")
+
+        self.mlp = Sequential(
+            Linear(emb_dim, 2 * emb_dim),
+            LayerNorm(2 * emb_dim),
+            LeakyReLU(0.15),
+            Dropout(dropout_out),
+            Linear(2 * emb_dim, emb_dim),
+            LayerNorm(emb_dim)
+        )
+
+        self.edge_encoder = Sequential(
+            Linear(edge_input_dim, emb_dim),
+            LayerNorm(emb_dim),
+            LeakyReLU(0.15),
+            Dropout(dropout_edge_mlp),
+            Linear(emb_dim, emb_dim),
+            LeakyReLU(0.15),
+            Linear(emb_dim, emb_dim)
+        )
+
+        self.eps = torch.nn.Parameter(torch.Tensor([1e-6])) # Valore piccolo non nullo
+
+        self.dropout = Dropout(dropout_out)
+
+    def forward(self, x, edge_index, edge_attr):
+        edge_embedding = self.edge_encoder(edge_attr)
+        out = self.propagate(edge_index, x=x, edge_attr=edge_embedding)
+        out = self.mlp((1 + self.eps) * x + out) # Somma pesata del nodo centrale e messaggi aggregati + MLP
+        # Residual connection + dropout
+        return x + self.dropout(out) # Residuale sull'input originale x
+
+    def message(self, x_j, edge_attr):
+        # Gated fusion tra x_j ed edge_attr
+        gate = torch.sigmoid(edge_attr)
+        return gate * x_j + (1 - gate) * edge_attr
+
+    def update(self, aggr_out):
+        return aggr_out
+
+class TransformerConvE(torch.nn.Module):
+    def __init__(self, in_channels, emb_dim, heads=1, concat=True,
+                 dropout_transformer=0.2, edge_input_dim=7, dropout_edge_mlp=0.2):
+        super().__init__()
+        self.in_channels = in_channels
+        self.emb_dim = emb_dim # Questo è l'out_channels per il TransformerConv o per il final_proj
+        self.heads = heads
+        self.concat = concat
+
+        # L'output di edge_encoder deve essere edge_dim per TransformerConv
+        # Se edge_dim = emb_dim, allora l'output di edge_encoder deve essere emb_dim
+        self.edge_encoder_output_dim = emb_dim # Assumiamo che edge_dim per TransformerConv sia emb_dim
+
+        edge_encoder_layers = [
+            Linear(edge_input_dim, self.edge_encoder_output_dim),
+            LeakyReLU(0.15),
+            Linear(self.edge_encoder_output_dim, self.edge_encoder_output_dim)
+        ]
+        if dropout_edge_mlp > 0:
+            edge_encoder_layers.append(torch.nn.Dropout(dropout_edge_mlp))
+        self.edge_encoder = Sequential(*edge_encoder_layers)
+
+
+        if concat:
+            out_channels_per_head = emb_dim // heads # out_channels per TransformerConv
+            transformer_conv_output_dim = heads * out_channels_per_head
+        else:
+            out_channels_per_head = emb_dim
+            transformer_conv_output_dim = emb_dim
+
+        self.transformer_conv = TransformerConv(
+            in_channels=in_channels, # Dimensione dell'input dei nodi
+            out_channels=out_channels_per_head, # Dimensione dell'output per testa
+            heads=heads,
+            concat=concat,
+            dropout=dropout_transformer,
+            edge_dim=self.edge_encoder_output_dim, # Dimensione dell'output dell'edge_encoder
+            root_weight=True,
+            beta=True # Abilita il gating beta per le feature degli archi
+        )
+
+        # Proiezione finale se l'output concatenato del transformer non corrisponde a emb_dim desiderato
+        if concat and transformer_conv_output_dim != emb_dim:
+            self.final_proj = Linear(transformer_conv_output_dim, emb_dim)
+        elif not concat and out_channels_per_head != emb_dim: # Anche se non concat, l'output potrebbe essere diverso
+            self.final_proj = Linear(out_channels_per_head, emb_dim)
+        else:
+            self.final_proj = torch.nn.Identity()
+
+
+    def forward(self, x, edge_index, edge_attr):
+        edge_embedding = self.edge_encoder(edge_attr)
+        out_transformer = self.transformer_conv(x, edge_index, edge_attr=edge_embedding)
+        out_projected = self.final_proj(out_transformer)
+        return out_projected
+
+
+class newModel(torch.nn.Module):
+    def __init__(self, emb_dim, edge_input_dim, num_classes, dropout=0.2):
+        super().__init__()
+        self.emb_dim = emb_dim
+        self.edge_input_dim = edge_input_dim
+
+        self.input_proj = Linear(1, emb_dim) # Assume feature nodi iniziali di dim 1
+
+        self.gin_block1 = torch.nn.ModuleList([
+            GINConvE(emb_dim, self.edge_input_dim, dropout_edge_mlp=dropout, dropout_out=dropout)
+            for _ in range(2)
+        ])
+        self.bn1 = BatchNorm1d(emb_dim)
+
+        self.transformer1 = TransformerConvE(emb_dim, emb_dim, heads=2, concat=True,
+                                             dropout_transformer=dropout, edge_input_dim=edge_input_dim, dropout_edge_mlp=dropout)
+        self.bn_transformer1 = BatchNorm1d(emb_dim)
+
+        self.gin_block2 = torch.nn.ModuleList([
+            GINConvE(emb_dim, edge_input_dim, dropout_edge_mlp=dropout, dropout_out=dropout)
+            for _ in range(2)
+        ])
+        self.bn2 = BatchNorm1d(emb_dim)
+
+        self.pool = global_mean_pool
+        self.classifier = Sequential(
+            Linear(emb_dim, emb_dim // 2),
+            LeakyReLU(0.15),
+            Dropout(dropout),
+            Linear(emb_dim // 2, num_classes)
+        )
+        self.dropout_final_nodes = Dropout(dropout) # Rinominato per chiarezza rispetto a self.dropout in GINConvE
+
+    # MODIFICA QUI: Cambia la firma di forward per accettare 'data' e restituisci (logits, embeddings)
+    def forward(self, data): # Accetta l'oggetto Data o Batch di PyG
+        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+
+        if x is None:
+            # Usa data.num_nodes per ottenere il numero di nodi nel batch corrente
+            num_nodes = data.num_nodes
+            x = torch.zeros((num_nodes, 1), device=edge_index.device if edge_index is not None else (batch.device if batch is not None else 'cpu'))
+
+        x = self.input_proj(x)
+
+        for conv_layer in self.gin_block1:
+            x = conv_layer(x, edge_index, edge_attr)
+        x = self.bn1(x)
+        x = F.leaky_relu(x, negative_slope=0.15)
+        x = self.dropout_final_nodes(x) # Usa il dropout del modello principale
+
+        residual_pre_transformer = x
+        x = self.transformer1(x, edge_index, edge_attr)
+        x = self.bn_transformer1(x)
+        x = F.leaky_relu(x, negative_slope=0.15)
+        x = self.dropout_final_nodes(x) # Usa il dropout del modello principale
+        x = x + residual_pre_transformer
+
+        for conv_layer in self.gin_block2:
+            x = conv_layer(x, edge_index, edge_attr)
+        x = self.bn2(x)
+        x_node_embeddings_final = F.leaky_relu(x, negative_slope=0.15) # Applica ReLU prima del dropout finale
+        x_node_embeddings_final = self.dropout_final_nodes(x_node_embeddings_final) # Applica dropout ai final node embeddings
+
+        # --- MODIFICA QUI: Cattura gli embedding del grafo ---
+        graph_embeddings = self.pool(x_node_embeddings_final, batch)
+        logits = self.classifier(graph_embeddings)
+
+        return logits, graph_embeddings # Restituisci logits e graph_embeddings
