@@ -1,10 +1,252 @@
-2024-12-23 01:18:47,508 - Epoch 1/10, Loss: 1.6933, Train Acc: 0.3182
-2024-12-23 01:19:10,045 - Epoch 2/10, Loss: 1.6282, Train Acc: 0.3637
-2024-12-23 01:19:32,983 - Epoch 3/10, Loss: 1.6134, Train Acc: 0.3747
-2024-12-23 01:19:56,574 - Epoch 4/10, Loss: 1.6012, Train Acc: 0.3895
-2024-12-23 01:20:20,250 - Epoch 5/10, Loss: 1.5857, Train Acc: 0.3908
-2024-12-23 01:20:44,060 - Epoch 6/10, Loss: 1.5821, Train Acc: 0.3922
-2024-12-23 01:21:07,617 - Epoch 7/10, Loss: 1.5774, Train Acc: 0.3746
-2024-12-23 01:21:31,245 - Epoch 8/10, Loss: 1.5700, Train Acc: 0.3371
-2024-12-23 01:21:54,971 - Epoch 9/10, Loss: 1.5633, Train Acc: 0.3962
-2024-12-23 01:22:18,675 - Epoch 10/10, Loss: 1.5531, Train Acc: 0.3827
+2025-05-30 09:35:27,210 - 
+============================================================
+>>> Starting main script for GNN type: newModel
+============================================================
+
+2025-05-30 09:35:27,211 - • Device     : cuda:0
+2025-05-30 09:35:27,212 - • Input args : Namespace(train_path='datasets/A/train.json.gz', test_path='datasets/A/test.json.gz', num_checkpoints=5, gnn_type='newModel', num_layer=2, emb_dim=128, drop_ratio=0.2, graph_pooling='attention', node_feat_dim_initial=1, no_residual=False, transformer_layers=1, transformer_heads=2, jk='last', epochs=100, batch_size=32, lr_model=0.001, weight_decay=1e-05, gradient_clipping=1.0, val_split_ratio=0.15, early_stopping_patience=20, criterion='gcod', label_smoothing=0.1, lr_u=0.01, lambda_l3_weight=0.7, epoch_boost=0, lr_scheduler_metric='val_f1', lr_scheduler_factor=0.2, lr_scheduler_patience=10, lr_scheduler_min_lr=1e-07, device=0, seed=777, predict=1, num_workers=2, num_classes_fallback=6, num_edge_features=None)
+
+2025-05-30 09:35:27,212 - >>> Loading training dataset from: datasets/A/train.json.gz
+2025-05-30 09:38:57,706 - >>> Parameters inferred from training dataset:
+2025-05-30 09:38:57,707 -   Num node features (initial): 1
+2025-05-30 09:38:57,707 -   Num edge features          : 7
+2025-05-30 09:38:57,708 -   Num classes                : 6
+2025-05-30 09:38:57,709 - >>> Building the model...
+2025-05-30 09:38:57,710 - Building newModel...
+2025-05-30 09:38:57,995 - • Model architecture      : newModel
+2025-05-30 09:38:57,996 - • Using emb_dim           : 128
+2025-05-30 09:38:57,997 - • Using drop_ratio        : 0.2
+2025-05-30 09:38:57,998 - • Total parameters        : 513,994
+
+2025-05-30 09:38:58,000 - >>> Preparing train and validation datasets...
+2025-05-30 09:38:58,053 - 
+------------------------------------------------------------
+>> Dataset: split in training/validation
+------------------------------------------------------------
+
+2025-05-30 09:38:58,053 - • Full dataset size       : 11280
+2025-05-30 09:38:58,054 - • Training set            : 9588 campioni
+2025-05-30 09:38:58,054 - • Validation set          : 1692 campioni
+
+2025-05-30 09:38:58,056 - >>> Preparing current training subset loader for atrain calculation (used by GCOD)...
+2025-05-30 09:38:58,092 - 
+------------------------------------------------------------
+>> Initializing Loss Function
+------------------------------------------------------------
+
+2025-05-30 09:38:58,092 - • Loss function used    : GCODLoss
+2025-05-30 09:38:58,093 - • Embeddings size       : 128
+2025-05-30 09:38:58,167 - >>> Loss function initialized and moved to device
+
+2025-05-30 09:38:58,168 - >>> Starting training loop...
+2025-05-30 09:39:54,240 - Epoch 1/100 | Train Loss: 7.5810, Acc: 38.38%, F1: 21.21% | Val Loss: 7.5100, Acc: 40.19%, F1: 25.12% | Time: 56.07s | a_train: 0.0658
+2025-05-30 09:39:54,256 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 25.12%)
+2025-05-30 09:40:47,971 - Epoch 2/100 | Train Loss: 4.6330, Acc: 46.79%, F1: 30.44% | Val Loss: 5.4546, Acc: 43.20%, F1: 25.81% | Time: 53.71s | a_train: 0.4045
+2025-05-30 09:40:47,986 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 25.81%)
+2025-05-30 09:41:41,566 - Epoch 3/100 | Train Loss: 4.2831, Acc: 51.20%, F1: 34.78% | Val Loss: 5.0094, Acc: 53.96%, F1: 39.01% | Time: 53.58s | a_train: 0.4348
+2025-05-30 09:41:41,580 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 39.01%)
+2025-05-30 09:42:34,992 - Epoch 4/100 | Train Loss: 3.7525, Acc: 54.28%, F1: 38.31% | Val Loss: 4.3969, Acc: 54.61%, F1: 38.99% | Time: 53.41s | a_train: 0.5458
+2025-05-30 09:42:34,992 - No improvement for 1 epoch(s). Best Val F1: 39.01%
+2025-05-30 09:43:28,385 - Epoch 5/100 | Train Loss: 3.6338, Acc: 55.42%, F1: 40.50% | Val Loss: 4.5360, Acc: 42.32%, F1: 30.55% | Time: 53.39s | a_train: 0.5638
+2025-05-30 09:43:28,386 - No improvement for 2 epoch(s). Best Val F1: 39.01%
+2025-05-30 09:44:21,752 - Epoch 6/100 | Train Loss: 3.9884, Acc: 56.30%, F1: 42.74% | Val Loss: 5.0163, Acc: 50.00%, F1: 41.65% | Time: 53.37s | a_train: 0.4422
+2025-05-30 09:44:21,776 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 41.65%)
+2025-05-30 09:45:15,027 - Epoch 7/100 | Train Loss: 3.7416, Acc: 57.15%, F1: 45.05% | Val Loss: 4.6094, Acc: 54.96%, F1: 43.97% | Time: 53.25s | a_train: 0.5072
+2025-05-30 09:45:15,041 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 43.97%)
+2025-05-30 09:46:08,354 - Epoch 8/100 | Train Loss: 3.5534, Acc: 59.07%, F1: 49.22% | Val Loss: 4.4905, Acc: 49.11%, F1: 40.55% | Time: 53.31s | a_train: 0.5512
+2025-05-30 09:46:08,354 - No improvement for 1 epoch(s). Best Val F1: 43.97%
+2025-05-30 09:47:01,773 - Epoch 9/100 | Train Loss: 3.6353, Acc: 59.79%, F1: 50.73% | Val Loss: 4.4624, Acc: 59.87%, F1: 53.13% | Time: 53.42s | a_train: 0.5160
+2025-05-30 09:47:01,788 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 53.13%)
+2025-05-30 09:47:55,432 - Epoch 10/100 | Train Loss: 3.2986, Acc: 61.47%, F1: 53.91% | Val Loss: 3.9532, Acc: 60.05%, F1: 52.93% | Time: 53.64s | a_train: 0.6149
+2025-05-30 09:47:55,433 - No improvement for 1 epoch(s). Best Val F1: 53.13%
+2025-05-30 09:48:48,978 - Epoch 11/100 | Train Loss: 3.2513, Acc: 62.57%, F1: 55.54% | Val Loss: 3.9642, Acc: 59.63%, F1: 52.83% | Time: 53.54s | a_train: 0.6228
+2025-05-30 09:48:48,978 - No improvement for 2 epoch(s). Best Val F1: 53.13%
+2025-05-30 09:49:42,810 - Epoch 12/100 | Train Loss: 3.2587, Acc: 63.02%, F1: 56.01% | Val Loss: 3.9640, Acc: 61.82%, F1: 55.90% | Time: 53.83s | a_train: 0.6144
+2025-05-30 09:49:42,826 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 55.90%)
+2025-05-30 09:50:36,485 - Epoch 13/100 | Train Loss: 3.1680, Acc: 64.01%, F1: 57.34% | Val Loss: 3.7999, Acc: 64.18%, F1: 57.27% | Time: 53.66s | a_train: 0.6381
+2025-05-30 09:50:36,500 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 57.27%)
+2025-05-30 09:51:30,231 - Epoch 14/100 | Train Loss: 3.0817, Acc: 64.42%, F1: 58.02% | Val Loss: 3.7228, Acc: 62.17%, F1: 57.88% | Time: 53.73s | a_train: 0.6607
+2025-05-30 09:51:30,245 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 57.88%)
+2025-05-30 09:52:23,789 - Epoch 15/100 | Train Loss: 3.1730, Acc: 64.85%, F1: 58.53% | Val Loss: 3.8309, Acc: 63.42%, F1: 55.60% | Time: 53.54s | a_train: 0.6265
+2025-05-30 09:52:23,790 - No improvement for 1 epoch(s). Best Val F1: 57.88%
+2025-05-30 09:53:17,611 - Epoch 16/100 | Train Loss: 3.0876, Acc: 65.30%, F1: 59.18% | Val Loss: 3.8805, Acc: 52.54%, F1: 49.84% | Time: 53.82s | a_train: 0.6520
+2025-05-30 09:53:17,612 - No improvement for 2 epoch(s). Best Val F1: 57.88%
+2025-05-30 09:54:11,343 - Epoch 17/100 | Train Loss: 3.3730, Acc: 64.64%, F1: 58.29% | Val Loss: 4.1831, Acc: 62.47%, F1: 55.16% | Time: 53.73s | a_train: 0.5507
+2025-05-30 09:54:11,344 - No improvement for 3 epoch(s). Best Val F1: 57.88%
+2025-05-30 09:55:05,061 - Epoch 18/100 | Train Loss: 3.0672, Acc: 66.41%, F1: 60.23% | Val Loss: 3.7679, Acc: 61.82%, F1: 56.14% | Time: 53.72s | a_train: 0.6505
+2025-05-30 09:55:05,062 - No improvement for 4 epoch(s). Best Val F1: 57.88%
+2025-05-30 09:55:58,885 - Epoch 19/100 | Train Loss: 3.0735, Acc: 66.42%, F1: 60.58% | Val Loss: 3.7143, Acc: 66.13%, F1: 60.17% | Time: 53.82s | a_train: 0.6448
+2025-05-30 09:55:58,900 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 60.17%)
+2025-05-30 09:56:52,585 - Epoch 20/100 | Train Loss: 2.9854, Acc: 65.39%, F1: 59.36% | Val Loss: 3.5965, Acc: 64.01%, F1: 56.73% | Time: 53.68s | a_train: 0.6789
+2025-05-30 09:56:52,585 - No improvement for 1 epoch(s). Best Val F1: 60.17%
+2025-05-30 09:57:46,247 - Epoch 21/100 | Train Loss: 3.0380, Acc: 66.71%, F1: 60.89% | Val Loss: 3.7360, Acc: 62.47%, F1: 54.99% | Time: 53.66s | a_train: 0.6539
+2025-05-30 09:57:46,248 - No improvement for 2 epoch(s). Best Val F1: 60.17%
+2025-05-30 09:58:39,893 - Epoch 22/100 | Train Loss: 3.0690, Acc: 66.97%, F1: 61.06% | Val Loss: 3.7467, Acc: 66.08%, F1: 59.65% | Time: 53.64s | a_train: 0.6379
+2025-05-30 09:58:39,894 - No improvement for 3 epoch(s). Best Val F1: 60.17%
+2025-05-30 09:59:33,543 - Epoch 23/100 | Train Loss: 2.9314, Acc: 67.57%, F1: 61.80% | Val Loss: 3.5774, Acc: 63.24%, F1: 56.13% | Time: 53.65s | a_train: 0.6846
+2025-05-30 09:59:33,544 - No improvement for 4 epoch(s). Best Val F1: 60.17%
+2025-05-30 10:00:27,499 - Epoch 24/100 | Train Loss: 3.0067, Acc: 67.21%, F1: 61.46% | Val Loss: 3.7148, Acc: 61.35%, F1: 54.25% | Time: 53.95s | a_train: 0.6577
+2025-05-30 10:00:27,499 - No improvement for 5 epoch(s). Best Val F1: 60.17%
+2025-05-30 10:01:21,372 - Epoch 25/100 | Train Loss: 3.0115, Acc: 68.03%, F1: 62.37% | Val Loss: 3.6835, Acc: 66.25%, F1: 59.77% | Time: 53.87s | a_train: 0.6496
+2025-05-30 10:01:21,372 - No improvement for 6 epoch(s). Best Val F1: 60.17%
+2025-05-30 10:02:15,045 - Epoch 26/100 | Train Loss: 2.9033, Acc: 68.40%, F1: 62.77% | Val Loss: 3.5346, Acc: 64.89%, F1: 58.63% | Time: 53.67s | a_train: 0.6859
+2025-05-30 10:02:15,046 - No improvement for 7 epoch(s). Best Val F1: 60.17%
+2025-05-30 10:03:08,716 - Epoch 27/100 | Train Loss: 2.8883, Acc: 68.82%, F1: 62.96% | Val Loss: 3.5008, Acc: 66.90%, F1: 60.60% | Time: 53.67s | a_train: 0.6880
+2025-05-30 10:03:08,730 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 60.60%)
+2025-05-30 10:04:02,266 - Epoch 28/100 | Train Loss: 2.8604, Acc: 69.36%, F1: 63.74% | Val Loss: 3.4865, Acc: 64.72%, F1: 57.38% | Time: 53.54s | a_train: 0.6961
+2025-05-30 10:04:02,267 - No improvement for 1 epoch(s). Best Val F1: 60.60%
+2025-05-30 10:04:55,923 - Epoch 29/100 | Train Loss: 2.9128, Acc: 69.27%, F1: 63.67% | Val Loss: 3.5716, Acc: 66.55%, F1: 61.43% | Time: 53.65s | a_train: 0.6757
+2025-05-30 10:04:55,937 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 61.43%)
+2025-05-30 10:05:49,540 - Epoch 30/100 | Train Loss: 2.8444, Acc: 69.83%, F1: 64.33% | Val Loss: 3.4444, Acc: 68.26%, F1: 62.26% | Time: 53.60s | a_train: 0.6962
+2025-05-30 10:05:49,554 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 62.26%)
+2025-05-30 10:06:43,188 - Epoch 31/100 | Train Loss: 2.8159, Acc: 70.43%, F1: 64.92% | Val Loss: 3.3939, Acc: 68.79%, F1: 63.42% | Time: 53.63s | a_train: 0.7044
+2025-05-30 10:06:43,204 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 63.42%)
+2025-05-30 10:07:36,950 - Epoch 32/100 | Train Loss: 2.7847, Acc: 70.52%, F1: 64.98% | Val Loss: 3.3624, Acc: 67.79%, F1: 62.80% | Time: 53.75s | a_train: 0.7149
+2025-05-30 10:07:36,951 - No improvement for 1 epoch(s). Best Val F1: 63.42%
+2025-05-30 10:08:30,678 - Epoch 33/100 | Train Loss: 2.8014, Acc: 70.41%, F1: 64.90% | Val Loss: 3.4389, Acc: 64.24%, F1: 59.98% | Time: 53.73s | a_train: 0.7074
+2025-05-30 10:08:30,679 - No improvement for 2 epoch(s). Best Val F1: 63.42%
+2025-05-30 10:09:24,322 - Epoch 34/100 | Train Loss: 2.9291, Acc: 70.16%, F1: 64.55% | Val Loss: 3.5968, Acc: 68.26%, F1: 62.80% | Time: 53.64s | a_train: 0.6577
+2025-05-30 10:09:24,323 - No improvement for 3 epoch(s). Best Val F1: 63.42%
+2025-05-30 10:10:17,942 - Epoch 35/100 | Train Loss: 2.7881, Acc: 70.41%, F1: 65.03% | Val Loss: 3.3503, Acc: 70.15%, F1: 65.01% | Time: 53.62s | a_train: 0.7107
+2025-05-30 10:10:17,957 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 65.01%)
+2025-05-30 10:11:11,594 - Epoch 36/100 | Train Loss: 2.7359, Acc: 71.34%, F1: 65.92% | Val Loss: 3.2824, Acc: 69.56%, F1: 64.36% | Time: 53.64s | a_train: 0.7257
+2025-05-30 10:11:11,594 - No improvement for 1 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:12:05,238 - Epoch 37/100 | Train Loss: 2.7337, Acc: 70.98%, F1: 65.89% | Val Loss: 3.2913, Acc: 67.20%, F1: 60.41% | Time: 53.64s | a_train: 0.7275
+2025-05-30 10:12:05,239 - No improvement for 2 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:12:59,010 - Epoch 38/100 | Train Loss: 2.8093, Acc: 70.15%, F1: 64.82% | Val Loss: 3.4165, Acc: 69.27%, F1: 64.23% | Time: 53.77s | a_train: 0.7001
+2025-05-30 10:12:59,011 - No improvement for 3 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:13:52,593 - Epoch 39/100 | Train Loss: 2.7475, Acc: 71.73%, F1: 66.36% | Val Loss: 3.3211, Acc: 69.03%, F1: 63.35% | Time: 53.58s | a_train: 0.7176
+2025-05-30 10:13:52,594 - No improvement for 4 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:14:46,331 - Epoch 40/100 | Train Loss: 2.7465, Acc: 71.62%, F1: 66.33% | Val Loss: 3.3108, Acc: 69.09%, F1: 63.73% | Time: 53.74s | a_train: 0.7170
+2025-05-30 10:14:46,332 - No improvement for 5 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:15:40,011 - Epoch 41/100 | Train Loss: 2.7449, Acc: 71.95%, F1: 66.75% | Val Loss: 3.3061, Acc: 70.45%, F1: 64.29% | Time: 53.68s | a_train: 0.7151
+2025-05-30 10:15:40,012 - No improvement for 6 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:16:33,766 - Epoch 42/100 | Train Loss: 2.6788, Acc: 72.35%, F1: 67.11% | Val Loss: 3.2380, Acc: 67.43%, F1: 60.71% | Time: 53.75s | a_train: 0.7388
+2025-05-30 10:16:33,767 - No improvement for 7 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:17:28,017 - Epoch 43/100 | Train Loss: 2.7631, Acc: 71.81%, F1: 66.51% | Val Loss: 3.3972, Acc: 66.25%, F1: 62.07% | Time: 54.25s | a_train: 0.7063
+2025-05-30 10:17:28,018 - No improvement for 8 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:18:22,286 - Epoch 44/100 | Train Loss: 2.8085, Acc: 71.46%, F1: 66.34% | Val Loss: 3.4485, Acc: 67.97%, F1: 62.85% | Time: 54.27s | a_train: 0.6880
+2025-05-30 10:18:22,287 - No improvement for 9 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:19:16,789 - Epoch 45/100 | Train Loss: 2.7193, Acc: 72.36%, F1: 67.05% | Val Loss: 3.3176, Acc: 68.03%, F1: 63.68% | Time: 54.50s | a_train: 0.7196
+2025-05-30 10:19:16,789 - No improvement for 10 epoch(s). Best Val F1: 65.01%
+2025-05-30 10:20:11,825 - Epoch 46/100 | Train Loss: 2.7343, Acc: 72.47%, F1: 67.23% | Val Loss: 3.3009, Acc: 71.22%, F1: 65.51% | Time: 55.03s | a_train: 0.7108
+2025-05-30 10:20:11,843 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 65.51%)
+2025-05-30 10:21:07,051 - Epoch 47/100 | Train Loss: 2.6621, Acc: 72.81%, F1: 67.56% | Val Loss: 3.1736, Acc: 72.16%, F1: 65.95% | Time: 55.21s | a_train: 0.7381
+2025-05-30 10:21:07,069 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 65.95%)
+2025-05-30 10:22:01,350 - Epoch 48/100 | Train Loss: 2.6291, Acc: 72.83%, F1: 67.54% | Val Loss: 3.1553, Acc: 70.33%, F1: 65.51% | Time: 54.28s | a_train: 0.7497
+2025-05-30 10:22:01,351 - No improvement for 1 epoch(s). Best Val F1: 65.95%
+2025-05-30 10:22:55,676 - Epoch 49/100 | Train Loss: 2.6469, Acc: 72.87%, F1: 67.51% | Val Loss: 3.1970, Acc: 68.62%, F1: 62.56% | Time: 54.32s | a_train: 0.7421
+2025-05-30 10:22:55,676 - No improvement for 2 epoch(s). Best Val F1: 65.95%
+2025-05-30 10:23:50,126 - Epoch 50/100 | Train Loss: 2.6903, Acc: 72.82%, F1: 67.43% | Val Loss: 3.2852, Acc: 68.68%, F1: 63.88% | Time: 54.45s | a_train: 0.7246
+2025-05-30 10:23:50,127 - No improvement for 3 epoch(s). Best Val F1: 65.95%
+2025-05-30 10:24:44,633 - Epoch 51/100 | Train Loss: 2.6500, Acc: 73.03%, F1: 67.95% | Val Loss: 3.1910, Acc: 70.57%, F1: 64.90% | Time: 54.50s | a_train: 0.7383
+2025-05-30 10:24:44,633 - No improvement for 4 epoch(s). Best Val F1: 65.95%
+2025-05-30 10:25:39,274 - Epoch 52/100 | Train Loss: 2.6483, Acc: 72.79%, F1: 67.63% | Val Loss: 3.2051, Acc: 68.68%, F1: 63.18% | Time: 54.64s | a_train: 0.7383
+2025-05-30 10:25:39,274 - No improvement for 5 epoch(s). Best Val F1: 65.95%
+2025-05-30 10:26:34,597 - Epoch 53/100 | Train Loss: 2.6743, Acc: 73.35%, F1: 68.18% | Val Loss: 3.2485, Acc: 68.91%, F1: 63.07% | Time: 55.32s | a_train: 0.7263
+2025-05-30 10:26:34,598 - No improvement for 6 epoch(s). Best Val F1: 65.95%
+2025-05-30 10:27:29,838 - Epoch 54/100 | Train Loss: 2.6886, Acc: 72.96%, F1: 67.72% | Val Loss: 3.2819, Acc: 69.80%, F1: 64.19% | Time: 55.24s | a_train: 0.7203
+2025-05-30 10:27:29,839 - No improvement for 7 epoch(s). Best Val F1: 65.95%
+2025-05-30 10:28:24,312 - Epoch 55/100 | Train Loss: 2.6436, Acc: 73.24%, F1: 68.03% | Val Loss: 3.1910, Acc: 71.69%, F1: 66.01% | Time: 54.47s | a_train: 0.7360
+2025-05-30 10:28:24,328 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 66.01%)
+2025-05-30 10:29:18,783 - Epoch 56/100 | Train Loss: 2.5971, Acc: 74.12%, F1: 68.96% | Val Loss: 3.1136, Acc: 71.81%, F1: 66.33% | Time: 54.45s | a_train: 0.7507
+2025-05-30 10:29:18,803 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 66.33%)
+2025-05-30 10:30:13,045 - Epoch 57/100 | Train Loss: 2.6076, Acc: 73.52%, F1: 68.32% | Val Loss: 3.1701, Acc: 70.15%, F1: 65.31% | Time: 54.24s | a_train: 0.7472
+2025-05-30 10:30:13,046 - No improvement for 1 epoch(s). Best Val F1: 66.33%
+2025-05-30 10:31:07,126 - Epoch 58/100 | Train Loss: 2.6466, Acc: 73.46%, F1: 68.25% | Val Loss: 3.1866, Acc: 72.46%, F1: 67.14% | Time: 54.08s | a_train: 0.7310
+2025-05-30 10:31:07,143 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 67.14%)
+2025-05-30 10:32:01,305 - Epoch 59/100 | Train Loss: 2.5779, Acc: 73.59%, F1: 68.48% | Val Loss: 3.0747, Acc: 72.34%, F1: 66.70% | Time: 54.16s | a_train: 0.7569
+2025-05-30 10:32:01,306 - No improvement for 1 epoch(s). Best Val F1: 67.14%
+2025-05-30 10:32:55,753 - Epoch 60/100 | Train Loss: 2.5860, Acc: 74.12%, F1: 69.26% | Val Loss: 3.0946, Acc: 71.93%, F1: 66.21% | Time: 54.45s | a_train: 0.7513
+2025-05-30 10:32:55,754 - No improvement for 2 epoch(s). Best Val F1: 67.14%
+2025-05-30 10:33:50,713 - Epoch 61/100 | Train Loss: 2.5731, Acc: 74.01%, F1: 68.99% | Val Loss: 3.0810, Acc: 72.28%, F1: 67.38% | Time: 54.96s | a_train: 0.7554
+2025-05-30 10:33:50,731 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 67.38%)
+2025-05-30 10:34:45,455 - Epoch 62/100 | Train Loss: 2.5777, Acc: 74.00%, F1: 69.07% | Val Loss: 3.0912, Acc: 71.75%, F1: 66.13% | Time: 54.72s | a_train: 0.7525
+2025-05-30 10:34:45,456 - No improvement for 1 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:35:40,735 - Epoch 63/100 | Train Loss: 2.5746, Acc: 74.17%, F1: 69.10% | Val Loss: 3.0930, Acc: 72.34%, F1: 67.20% | Time: 55.28s | a_train: 0.7531
+2025-05-30 10:35:40,736 - No improvement for 2 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:36:35,963 - Epoch 64/100 | Train Loss: 2.5490, Acc: 74.21%, F1: 69.34% | Val Loss: 3.0444, Acc: 72.28%, F1: 66.90% | Time: 55.23s | a_train: 0.7628
+2025-05-30 10:36:35,964 - No improvement for 3 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:37:31,234 - Epoch 65/100 | Train Loss: 2.5549, Acc: 74.44%, F1: 69.45% | Val Loss: 3.0737, Acc: 71.16%, F1: 66.32% | Time: 55.27s | a_train: 0.7586
+2025-05-30 10:37:31,235 - No improvement for 4 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:38:26,541 - Epoch 66/100 | Train Loss: 2.5957, Acc: 74.25%, F1: 69.34% | Val Loss: 3.1611, Acc: 70.04%, F1: 65.00% | Time: 55.31s | a_train: 0.7416
+2025-05-30 10:38:26,541 - No improvement for 5 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:39:21,829 - Epoch 67/100 | Train Loss: 2.5777, Acc: 74.57%, F1: 69.58% | Val Loss: 3.1567, Acc: 68.09%, F1: 63.70% | Time: 55.29s | a_train: 0.7475
+2025-05-30 10:39:21,829 - No improvement for 6 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:40:17,063 - Epoch 68/100 | Train Loss: 2.6446, Acc: 74.36%, F1: 69.20% | Val Loss: 3.2391, Acc: 72.10%, F1: 67.06% | Time: 55.23s | a_train: 0.7186
+2025-05-30 10:40:17,064 - No improvement for 7 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:41:12,257 - Epoch 69/100 | Train Loss: 2.5572, Acc: 74.30%, F1: 69.38% | Val Loss: 3.0627, Acc: 72.64%, F1: 67.03% | Time: 55.19s | a_train: 0.7554
+2025-05-30 10:41:12,258 - No improvement for 8 epoch(s). Best Val F1: 67.38%
+2025-05-30 10:42:06,911 - Epoch 70/100 | Train Loss: 2.5427, Acc: 74.67%, F1: 70.01% | Val Loss: 3.0359, Acc: 73.52%, F1: 68.57% | Time: 54.65s | a_train: 0.7583
+2025-05-30 10:42:06,925 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 68.57%)
+2025-05-30 10:43:00,846 - Epoch 71/100 | Train Loss: 2.5059, Acc: 75.21%, F1: 70.31% | Val Loss: 3.0211, Acc: 70.45%, F1: 65.43% | Time: 53.92s | a_train: 0.7707
+2025-05-30 10:43:00,846 - No improvement for 1 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:43:56,012 - Epoch 72/100 | Train Loss: 2.5633, Acc: 74.73%, F1: 69.82% | Val Loss: 3.0915, Acc: 72.40%, F1: 67.05% | Time: 55.16s | a_train: 0.7465
+2025-05-30 10:43:56,013 - No improvement for 2 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:44:51,197 - Epoch 73/100 | Train Loss: 2.5231, Acc: 74.95%, F1: 70.19% | Val Loss: 3.0499, Acc: 70.27%, F1: 65.22% | Time: 55.18s | a_train: 0.7625
+2025-05-30 10:44:51,198 - No improvement for 3 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:45:46,310 - Epoch 74/100 | Train Loss: 2.5620, Acc: 74.69%, F1: 69.94% | Val Loss: 3.1363, Acc: 69.50%, F1: 65.09% | Time: 55.11s | a_train: 0.7460
+2025-05-30 10:45:46,311 - No improvement for 4 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:46:41,431 - Epoch 75/100 | Train Loss: 2.5633, Acc: 74.98%, F1: 70.12% | Val Loss: 3.0907, Acc: 73.17%, F1: 67.86% | Time: 55.12s | a_train: 0.7437
+2025-05-30 10:46:41,432 - No improvement for 5 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:47:36,614 - Epoch 76/100 | Train Loss: 2.5066, Acc: 75.10%, F1: 70.29% | Val Loss: 3.0067, Acc: 72.28%, F1: 67.19% | Time: 55.18s | a_train: 0.7671
+2025-05-30 10:47:36,614 - No improvement for 6 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:48:32,014 - Epoch 77/100 | Train Loss: 2.5051, Acc: 75.00%, F1: 70.19% | Val Loss: 3.0034, Acc: 72.75%, F1: 67.89% | Time: 55.40s | a_train: 0.7671
+2025-05-30 10:48:32,015 - No improvement for 7 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:49:27,172 - Epoch 78/100 | Train Loss: 2.5106, Acc: 75.86%, F1: 71.23% | Val Loss: 3.0626, Acc: 69.74%, F1: 65.16% | Time: 55.16s | a_train: 0.7620
+2025-05-30 10:49:27,173 - No improvement for 8 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:50:22,365 - Epoch 79/100 | Train Loss: 2.5656, Acc: 75.39%, F1: 70.46% | Val Loss: 3.1113, Acc: 72.52%, F1: 67.46% | Time: 55.19s | a_train: 0.7384
+2025-05-30 10:50:22,366 - No improvement for 9 epoch(s). Best Val F1: 68.57%
+2025-05-30 10:51:17,742 - Epoch 80/100 | Train Loss: 2.5048, Acc: 75.38%, F1: 70.83% | Val Loss: 2.9964, Acc: 74.05%, F1: 68.72% | Time: 55.37s | a_train: 0.7637
+2025-05-30 10:51:17,760 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 68.72%)
+2025-05-30 10:52:13,003 - Epoch 81/100 | Train Loss: 2.4777, Acc: 75.69%, F1: 71.06% | Val Loss: 2.9583, Acc: 73.29%, F1: 68.68% | Time: 55.24s | a_train: 0.7732
+2025-05-30 10:52:13,004 - No improvement for 1 epoch(s). Best Val F1: 68.72%
+2025-05-30 10:53:08,153 - Epoch 82/100 | Train Loss: 2.4779, Acc: 75.84%, F1: 71.28% | Val Loss: 2.9612, Acc: 73.88%, F1: 68.87% | Time: 55.15s | a_train: 0.7719
+2025-05-30 10:53:08,171 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 68.87%)
+2025-05-30 10:54:03,054 - Epoch 83/100 | Train Loss: 2.4716, Acc: 75.90%, F1: 71.36% | Val Loss: 2.9819, Acc: 70.74%, F1: 66.03% | Time: 54.88s | a_train: 0.7739
+2025-05-30 10:54:03,055 - No improvement for 1 epoch(s). Best Val F1: 68.87%
+2025-05-30 10:54:57,323 - Epoch 84/100 | Train Loss: 2.5159, Acc: 75.28%, F1: 70.60% | Val Loss: 3.0461, Acc: 72.34%, F1: 67.42% | Time: 54.27s | a_train: 0.7557
+2025-05-30 10:54:57,324 - No improvement for 2 epoch(s). Best Val F1: 68.87%
+2025-05-30 10:55:52,030 - Epoch 85/100 | Train Loss: 2.5073, Acc: 75.76%, F1: 71.25% | Val Loss: 3.0405, Acc: 72.46%, F1: 67.41% | Time: 54.71s | a_train: 0.7567
+2025-05-30 10:55:52,031 - No improvement for 3 epoch(s). Best Val F1: 68.87%
+2025-05-30 10:56:47,005 - Epoch 86/100 | Train Loss: 2.4727, Acc: 75.94%, F1: 71.45% | Val Loss: 2.9661, Acc: 71.75%, F1: 66.05% | Time: 54.97s | a_train: 0.7705
+2025-05-30 10:56:47,006 - No improvement for 4 epoch(s). Best Val F1: 68.87%
+2025-05-30 10:57:42,353 - Epoch 87/100 | Train Loss: 2.4989, Acc: 76.16%, F1: 71.60% | Val Loss: 3.0177, Acc: 72.64%, F1: 67.76% | Time: 55.35s | a_train: 0.7584
+2025-05-30 10:57:42,354 - No improvement for 5 epoch(s). Best Val F1: 68.87%
+2025-05-30 10:58:36,521 - Epoch 88/100 | Train Loss: 2.4806, Acc: 76.18%, F1: 71.53% | Val Loss: 2.9734, Acc: 74.41%, F1: 69.42% | Time: 54.17s | a_train: 0.7657
+2025-05-30 10:58:36,539 - Best model updated and saved to /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth (Val F1: 69.42%)
+2025-05-30 10:59:30,180 - Epoch 89/100 | Train Loss: 2.4472, Acc: 76.04%, F1: 71.58% | Val Loss: 2.9187, Acc: 73.40%, F1: 68.19% | Time: 53.64s | a_train: 0.7793
+2025-05-30 10:59:30,180 - No improvement for 1 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:00:23,824 - Epoch 90/100 | Train Loss: 2.4573, Acc: 76.13%, F1: 71.65% | Val Loss: 2.9355, Acc: 74.17%, F1: 69.37% | Time: 53.64s | a_train: 0.7739
+2025-05-30 11:00:23,825 - No improvement for 2 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:01:17,481 - Epoch 91/100 | Train Loss: 2.4446, Acc: 76.30%, F1: 71.82% | Val Loss: 2.9334, Acc: 73.17%, F1: 68.31% | Time: 53.66s | a_train: 0.7784
+2025-05-30 11:01:17,482 - No improvement for 3 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:02:10,981 - Epoch 92/100 | Train Loss: 2.4684, Acc: 76.20%, F1: 71.73% | Val Loss: 2.9641, Acc: 73.11%, F1: 68.12% | Time: 53.50s | a_train: 0.7681
+2025-05-30 11:02:10,981 - No improvement for 4 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:03:04,758 - Epoch 93/100 | Train Loss: 2.4351, Acc: 76.15%, F1: 71.71% | Val Loss: 2.9188, Acc: 72.64%, F1: 67.51% | Time: 53.78s | a_train: 0.7814
+2025-05-30 11:03:04,759 - No improvement for 5 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:03:58,534 - Epoch 94/100 | Train Loss: 2.4578, Acc: 75.83%, F1: 71.14% | Val Loss: 2.9587, Acc: 72.46%, F1: 67.87% | Time: 53.77s | a_train: 0.7721
+2025-05-30 11:03:58,534 - No improvement for 6 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:04:52,425 - Epoch 95/100 | Train Loss: 2.4687, Acc: 76.23%, F1: 71.75% | Val Loss: 3.0229, Acc: 68.09%, F1: 64.10% | Time: 53.89s | a_train: 0.7661
+2025-05-30 11:04:52,425 - No improvement for 7 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:05:46,174 - Epoch 96/100 | Train Loss: 2.5125, Acc: 75.93%, F1: 71.32% | Val Loss: 3.0606, Acc: 73.17%, F1: 67.84% | Time: 53.75s | a_train: 0.7458
+2025-05-30 11:05:46,175 - No improvement for 8 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:06:39,882 - Epoch 97/100 | Train Loss: 2.4483, Acc: 76.20%, F1: 71.76% | Val Loss: 2.9665, Acc: 71.34%, F1: 66.34% | Time: 53.71s | a_train: 0.7726
+2025-05-30 11:06:39,883 - No improvement for 9 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:07:33,417 - Epoch 98/100 | Train Loss: 2.4566, Acc: 76.37%, F1: 71.81% | Val Loss: 2.9626, Acc: 73.05%, F1: 67.95% | Time: 53.53s | a_train: 0.7679
+2025-05-30 11:07:33,418 - No improvement for 10 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:08:27,056 - Epoch 99/100 | Train Loss: 2.4330, Acc: 76.59%, F1: 72.22% | Val Loss: 2.9352, Acc: 71.63%, F1: 67.21% | Time: 53.64s | a_train: 0.7772
+2025-05-30 11:08:27,057 - No improvement for 11 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:09:20,645 - Epoch 100/100 | Train Loss: 2.4742, Acc: 76.45%, F1: 71.90% | Val Loss: 2.9906, Acc: 73.52%, F1: 68.45% | Time: 53.59s | a_train: 0.7586
+2025-05-30 11:09:20,646 - No improvement for 12 epoch(s). Best Val F1: 69.42%
+2025-05-30 11:09:20,646 - 
+============================================================
+>>> Training completed in 5422.48 seconds
+============================================================
+
+2025-05-30 11:09:21,290 - >>> Loading model from /kaggle/working/Hackaton_DeepL/checkpoints/model_A_newModel_best.pth for prediction.
+2025-05-30 11:09:21,318 - Model loaded successfully for prediction.
+2025-05-30 11:09:21,318 - >>> Preparing test dataset...
+2025-05-30 11:09:54,009 - >>> Generating predictions for the test set...
+2025-05-30 11:09:58,544 - Predictions saved to /kaggle/working/Hackaton_DeepL/submissions/predictions_A_newModel.txt
+2025-05-30 11:09:58,544 - Main script finished <<<
