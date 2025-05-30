@@ -130,7 +130,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
             hidden_channels=args.emb_dim,
             out_channels=num_dataset_classes,
             num_gin_layers=args.num_layer, # Numero di layer GIN
-            emb_dim=args.emb_dim,
+            no_residual=args.no_residual,
             jk=args.jk,
             edge_dim=num_edge_features_resolved,
             dropout_rate=args.drop_ratio,
@@ -170,7 +170,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
     logging.info(f"• Embedding dimension     : {args.emb_dim}")
     logging.info(f"• Dropout                 : {args.drop_ratio}")
     logging.info(f"• Graph Pooling           : {args.graph_pooling if args.gnn_type == 'gine' else 'N/A for GINENet as implemented here'}")
-    # logging.info(f"• Residual                : {not args.no_residual}") # Non rilevante per GINENet base
+    logging.info(f"• Residual                : {not args.no_residual}")
     logging.info(f"• Total parameters        : {total_params:,}\n")
 
     optimizer_model = torch.optim.AdamW(model.parameters(), lr=args.lr_model, weight_decay=args.weight_decay)

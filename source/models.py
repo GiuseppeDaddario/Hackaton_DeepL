@@ -226,7 +226,7 @@ from torch_geometric.utils import to_dense_batch # Utile per il Transformer per-
 import logging
 
 class GINEncoderBlock(nn.Module):
-    def __init__(self, hidden_dim, dropout_rate, edge_dim_in_gine):
+    def __init__(self, hidden_dim, dropout_rate, no_residual, edge_dim_in_gine):
         super().__init__()
         mlp = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim * 2),
@@ -237,18 +237,22 @@ class GINEncoderBlock(nn.Module):
         self.norm = BatchNorm(hidden_dim)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout_rate)
+        self.residual = not no_residual
 
     def forward(self, x, edge_index, edge_attr):
-        x_residual = x
-        x_conv = self.conv(x, edge_index, edge_attr=edge_attr)
-        x_norm = self.norm(x_conv)
-        x_sum = x_norm + x_residual
-        x_relu = self.relu(x_sum)
-        x_drop = self.dropout(x_relu)
-        return x_drop
+        residual = x
+        out = self.conv(x, edge_index, edge_attr=edge_attr)
+        out = self.norm(out)
+        out = self.dropout(out)
+        if self.residual:
+            logging.debug("GINEncoderBlock: Residual connection applied.")
+            out = out + residual
+        out = self.relu(out)
+
+        return out
 
 class GINENetWithTransformer(nn.Module): # Rinominata per chiarezza
-    def __init__(self, in_channels, hidden_channels, out_channels, num_gin_layers, emb_dim, jk="last",
+    def __init__(self, in_channels, hidden_channels, out_channels, num_gin_layers, no_residual=False, jk="last",
                  edge_dim=0, dropout_rate=0.5, graph_pooling="mean",
                  # Parametri per il Transformer
                  num_transformer_layers=0, # Metti > 0 per attivare il Transformer
@@ -273,7 +277,7 @@ class GINENetWithTransformer(nn.Module): # Rinominata per chiarezza
 
         self.gin_convs = nn.ModuleList() # Rinominato per chiarezza
         for _ in range(num_gin_layers):
-            self.gin_convs.append(GINEncoderBlock(hidden_channels, dropout_rate, self.gine_edge_dim_for_conv))
+            self.gin_convs.append(GINEncoderBlock(hidden_channels, dropout_rate, no_residual, self.gine_edge_dim_for_conv))
 
         # --- Transformer Encoder ---
         self.num_transformer_layers = num_transformer_layers
