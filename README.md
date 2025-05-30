@@ -8,6 +8,9 @@ This project implements a framework for graph classification tasks. It features 
 
 
 # HERE GOES THE TEASER IMAGE
+<p align="center">
+  <img src="preview.jpg" alt="Descrizione" width="400">
+</p>
 
 ## Models' details
 
