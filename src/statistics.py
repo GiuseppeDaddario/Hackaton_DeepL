@@ -38,23 +38,34 @@ def evaluateTwo(data_loader, model, device, criterion):
     total_loss = 0
     all_preds = []
     all_labels = []
+    accuracy = 0.0
+    f1 = 0.0
+    all_preds = []
+    all_labels = []
 
-    with torch.no_grad():
-        for data in tqdm(data_loader, desc="Evaluation -->", unit="batch"):
-            data = data.to(device)
-            output = model(data)
-            loss = criterion(output, data.y)
-            total_loss += loss.item()
+    if criterion == "ce":
+        criterion = torch.nn.CrossEntropyLoss()
+    
+        with torch.no_grad():
+            for data in tqdm(data_loader, desc="Evaluation -->", unit="batch"):
+                data = data.to(device)
+                output = model(data)
+                loss = criterion(output, data.y)
+                total_loss += loss.item()
 
-            pred = output.argmax(dim=1)
-            all_preds.extend(pred.cpu().numpy())
-            all_labels.extend(data.y.cpu().numpy())
-            correct += (pred == data.y).sum().item()
-            total += data.y.size(0)
+                pred = output.argmax(dim=1)
+                all_preds.extend(pred.cpu().numpy())
+                all_labels.extend(data.y.cpu().numpy())
+                correct += (pred == data.y).sum().item()
+                total += data.y.size(0)
 
-    accuracy = correct / total
-    avg_loss = total_loss / len(data_loader)
-    f1 = f1_score(all_labels, all_preds, average="macro")
+        accuracy = correct / total
+        avg_loss = total_loss / len(data_loader)
+        f1 = f1_score(all_labels, all_preds, average="macro")
+
+    elif criterion == "gcod":
+        from src.loss import gcodLoss
+        print("ancora da implementare")
 
     return accuracy, avg_loss, f1
 

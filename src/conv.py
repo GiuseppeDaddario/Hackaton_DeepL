@@ -132,9 +132,10 @@ class GCNConv(MessagePassing):
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 class GINETransformerNet(torch.nn.Module):
-    def __init__(self, num_layer, emb_dim, num_classes, num_heads, ff_dim, drop_ratio, gnn_type='gine', residual=True):
+    def __init__(self, num_layer, emb_dim, num_classes, num_heads, ff_dim, drop_ratio, gnn_type='gine', residual=True, return_embedding=False):
         super(GINETransformerNet, self).__init__()
 
+       
         # FIRST LAYER: GNN for node embeddings
         self.gnn = GNN_node(
             num_layer=num_layer,
@@ -167,31 +168,58 @@ class GINETransformerNet(torch.nn.Module):
 
 
 
-    def forward(self, data):
-        x = self.gnn(data)  # Node embeddings [num_nodes, emb_dim]
+    """     def forward(self, data):
+            x = self.gnn(data)  # Node embeddings [num_nodes, emb_dim]
 
-        # Group nodes into graphs using batch info
-        batch = data.batch  # [num_nodes]
+            # Group nodes into graphs using batch info
+            batch = data.batch  # [num_nodes]
+            max_nodes = batch.bincount().max().item()
+
+            # Pad graphs to fixed size for Transformer
+            padded_x = torch.zeros(batch.size(0), max_nodes, x.size(-1), device=x.device)
+            mask = torch.zeros(batch.size(0), max_nodes, dtype=torch.bool, device=x.device)
+
+            for i in range(batch.max() + 1):
+                node_idx = (batch == i).nonzero(as_tuple=False).view(-1)
+                padded_x[i, :len(node_idx)] = x[node_idx]
+                mask[i, :len(node_idx)] = True
+
+            # Pass through transformer
+            encoded = self.transformer(padded_x, src_key_padding_mask=~mask)
+
+            # Readout: mean over valid nodes
+            masked_encoded = encoded * mask.unsqueeze(-1)
+            graph_reps = masked_encoded.sum(dim=1) / mask.sum(dim=1, keepdim=True)
+
+            return self.mlp_head(graph_reps) """
+        
+
+
+    def forward(self, data, return_embedding=False):
+        x = self.gnn(data)  # [num_nodes, emb_dim]
+        batch = data.batch
         max_nodes = batch.bincount().max().item()
 
-        # Pad graphs to fixed size for Transformer
-        padded_x = torch.zeros(batch.size(0), max_nodes, x.size(-1), device=x.device)
-        mask = torch.zeros(batch.size(0), max_nodes, dtype=torch.bool, device=x.device)
+        padded_x = torch.zeros(batch.max() + 1, max_nodes, x.size(-1), device=x.device)
+        mask = torch.zeros(batch.max() + 1, max_nodes, dtype=torch.bool, device=x.device)
 
         for i in range(batch.max() + 1):
             node_idx = (batch == i).nonzero(as_tuple=False).view(-1)
             padded_x[i, :len(node_idx)] = x[node_idx]
             mask[i, :len(node_idx)] = True
 
-        # Pass through transformer
         encoded = self.transformer(padded_x, src_key_padding_mask=~mask)
 
-        # Readout: mean over valid nodes
         masked_encoded = encoded * mask.unsqueeze(-1)
         graph_reps = masked_encoded.sum(dim=1) / mask.sum(dim=1, keepdim=True)
 
-        return self.mlp_head(graph_reps)
-    
+        out = self.mlp_head(graph_reps)
+
+        if return_embedding:
+            return out, graph_reps  # You get both prediction and embedding
+        else:
+            return out
+
     ################################
     ################################
 

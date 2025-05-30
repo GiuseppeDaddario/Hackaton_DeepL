@@ -54,7 +54,7 @@ def main(args):
         model = GNN(gnn_type = 'gine', num_class = 6, num_layer = args.num_layer, emb_dim = args.emb_dim, drop_ratio = args.drop_ratio, virtual_node = True).to(device)
     
     elif args.gnn == 'gineTransformer':
-        model = GINETransformerNet(num_layer=args.num_layer, emb_dim=args.emb_dim,num_classes=args.num_classes,gnn_type='gineTransformer',drop_ratio=args.drop_ratio,ff_dim=args.ff_dim,residual=args.residuals,num_heads=args.num_heads).to(device)
+        model = GINETransformerNet(num_layer=args.num_layer, emb_dim=args.emb_dim,num_classes=args.num_classes,gnn_type='gine',drop_ratio=args.drop_ratio,ff_dim=args.ff_dim,residual=args.residual,num_heads=args.num_heads).to(device)
 
     
     # elif args.gnn == 'gineTrans-virtual':
@@ -62,8 +62,9 @@ def main(args):
     else:
         raise ValueError('Invalid GNN type')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    criterion = torch.nn.CrossEntropyLoss()
+    
 
+    
     # Identify dataset folder (A, B, C, or D)
     test_dir_name = os.path.basename(os.path.dirname(args.test_path))
     
@@ -138,7 +139,7 @@ def main(args):
             
         for epoch in range(num_epochs):
             train_loss, train_acc, train_f1 = train(
-                train_loader, model, optimizer, criterion, device,
+                train_loader, model, optimizer, args.criterion, device,
                 save_checkpoints=(epoch + 1 in checkpoint_intervals),
                 checkpoint_path=os.path.join(checkpoints_folder, f"model_{test_dir_name}"),
                 current_epoch=epoch
@@ -146,7 +147,7 @@ def main(args):
             
             
             # EVALUATION
-            valid_acc, valid_loss, valid_f1 = evaluateTwo(valid_loader, model, device, criterion = criterion)
+            valid_acc, valid_loss, valid_f1 = evaluateTwo(valid_loader, model, device, criterion = args.criterion)
 
             #print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
             
@@ -181,8 +182,8 @@ def main(args):
     save_predictions(predictions, args.test_path)
 
 
-TRAIN_PATH = r"C:\Users\Lorenzo\Desktop\Progetto\datasets\A\train.json.gz"
-TEST_PATH = r"C:\Users\Lorenzo\Desktop\Progetto\datasets\A\train.json.gz"
+TRAIN_PATH = r"C:\Users\Lorenzo\Desktop\Progetto\datasets\A\train_part_1.json.gz"
+TEST_PATH = r"C:\Users\Lorenzo\Desktop\Progetto\datasets\A\train_part_2.json.gz"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train and evaluate GNN models on graph datasets.")
@@ -196,7 +197,7 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=int, default=0, help='which gpu to use if any (default: 0)')
     
     ## GNN-specific parameters
-    parser.add_argument('--gnn', type=str, default='gine', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')
+    parser.add_argument('--gnn', type=str, default='gineTransformer', help='GNN gin, gin-virtual, or gcn, or gcn-virtual (default: gin-virtual)')
     parser.add_argument('--drop_ratio', type=float, default=0.2, help='dropout ratio (default: 0.5)')
     parser.add_argument('--num_layer', type=int, default=2, help='number of GNN message passing layers (default: 5)')
     parser.add_argument('--emb_dim', type=int, default=128, help='dimensionality of hidden units in GNNs (default: 300)')
@@ -205,8 +206,8 @@ if __name__ == "__main__":
     # Transformer-specific parameters
     parser.add_argument('--num_heads', type=int, default=4, help='Number of attention heads in Transformer (default: 4)')
     parser.add_argument('--ff_dim', type=int, default=128, help='Dimensionality of feedforward layer in Transformer (default: 256)')
-
-
+    parser.add_argument('--criterion', type=str, default='gcod', choices=['ce', 'gcod'], help='Loss function to use (default: cross_entropy)')
+    parser.add_argument('--num_classes', type=int, default=6, help='Number of classes for classification (default: 6)')
 
     args = parser.parse_args()
     main(args)
