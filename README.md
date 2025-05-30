@@ -1,13 +1,16 @@
-# Graph Neural Network for Graph Classification [DL Hackaton]
-
+# Graph Neural Network for Graph Classification
+### Deep Learning Hackaton - La Sapienza, Roma
 **Giuseppe D'Addario** 2177530, **Lorenzo Benucci** 2219690.
 
 ---
 
-This project implements a framework for graph classification tasks. It features **Graph Neural Network** (GNN) architectures, including **GNNtransformers** and the advanced loss function `GCOD`.  
+This project implements a framework for graph classification tasks under different type of label noise. It features **Graph Neural Network** (GNN) architectures, including **GNNtransformers** and the advanced loss function `GCOD`.  
+## Overview of the Method
+
+Initial experiments employed basic GIN models; however, both *accuracy* and *F1 scores* remained low, indicating limited generalization capability. To address this, hybrid architectures combining **GIN** and **Transformer** layers were introduced, leading to substantial performance improvements on datasets C and D. Building on these results, a more sophisticated model was developed, integrating **GINEConv** and **Transformer** layers within a unified framework. This architecture also incorporated batch normalization, *LeakyReLU* activation, *dropout* for regularization, and a final *linear classifier*.
 
 
-# HERE GOES THE TEASER IMAGE
+
 <p align="center">
   <img src="preview.jpg" alt="Descrizione" width="400">
 </p>
@@ -20,27 +23,36 @@ Two distinct strategies are proposed:
     
 * `GINE + transformer` model for A and B datasets
 ---
-*   **GNN [C,D Datasets]:**
-    * The core is the `TransformerConvBlock` which is a graph convolutional layer
-    * The GNN_node manages the message passing between nodes.
+
+
+*   **GNN** [ *N.E → E.E. → TransConv → LeakyReLU → Dropout → Residual → Pooling → MLP*]
+    * **GINConvE** layers followed by batch normalization and LeakyReLU activation, capturing local neighborhood structures.
+      After transformer, there are still two of these layers to refine the representation of graphs.
+    * **Mean pooling** layer to aggregate node embeddings.
+    * `TransformerConvBlock`, which forms the core of the model, is a graph convolutional layer based on the transformer architecture with a self-attention mechanism. This design enables it to capture complex, long-range dependencies between nodes in the graph, allowing the network to model global context and interactions beyond immediate neighbors. As a result, it significantly enhances the expressiveness of the node representations.
+
     * **Dropout** is used to reduce overfitting by randomly deactivating neurons during training, preventing the model from relying too heavily on specific activations and improving generalization.
-    * **Residual Connections** help stabilize training by preserving the original input across layers, allowing gradients to flow better.
+    * **MLP** with *Leaky ReLU* mapping the graph embedding to the output classes.
+    * **Residual connections** help stabilize training by preserving the original input across layers, allowing gradients to flow better.
 
-*   **GINE + TRANSFORMER [A,B Datasets]:**
-    * A sequence of two **GINConvE** layers followed by batch normalization and LeakyReLU activation, capturing local neighborhood structures.
+
+
+*   **GINE + TRANSFORMER** [ *2xGIN → B.L.D. → TransConv → B.L.D. → 2xGIN → B.L.D. → Pooling → MLP*]
+
+    * **GINE** The GINE layers are fundamental for local neighborhood aggregation, capturing structural patterns around each node. Their strong discriminative power ensures that subtle topological differences across graphs are effectively encoded into the node and edge embeddings.
+    * **B.L.D.** (***B**atchNorm-**L**eakyReLU-**D**ropout*) 
+      * **BatchNorm** normalizes input embeddings increasing stability and training speed.
+      * **Leaky ReLU** allows a small, non-zero gradient when the input is negative, helping to avoid the "dying neuron" problem.
+      * **Dropout** for mitigating overfitting.
+
     * A **TransformerConvE** layer with edge-aware attention mechanisms, capturing long-range dependencies across the graph. Includes residual connection and batch normalization.
-    * Another two-layer **GIN block** for refining node embeddings post-transformer.
-    * Mean pooling layer to aggregate node embeddings.
-    * A two-layer **MLP** with *LeakyReLU* and *Dropout*, mapping the graph embedding to the output classes.
-    * **Dropout** As before.
-    * **Residuals** As before.
+ 
+    * **Residual Connections** as before.
+    * **Pooling** Aggregates node embeddings into a fixed-size vector, preparing the graph representation for the classifier.
+    * **MLP** for classification.
 
-## Overview of the Method
 
-Initial experiments were conducted using simple `GIN` models, but the resulting accuracy and F1 scores remained low, suggesting that these models lacked sufficient generalization capability. Subsequently, hybrid approaches combining a `GIN` and a `Transformer` were explored, yielding significantly improved performance on datasets C and D. Finally, a more advanced model was implemented, integrating `GINEConv` and `Transformer` layers within a unified architecture. This model also incorporated **batch normalization**, a **linear classifier** with **LeakyReLU** activation, and **dropout** for regularization.
-
----
-#### <u>GCOD</u>
+## <u>GCOD</u>
 To mitigate overfitting due to noise, we found that using the **GCOD** loss instead of the standard *Cross-Entropy* significantly improves performance.
 
 *   **How it works:**
@@ -78,7 +90,7 @@ To mitigate overfitting due to noise, we found that using the **GCOD** loss inst
 
 ## Code Structure
 
-The script inscludes a `requirements.txt` containing all dependencies needed to run the code. Other files are organized as below:
+The script includes a `requirements.txt` containing all dependencies needed to run the code. Other files are organized as below:
 
 - **`main.py`:** The main script for training, evaluating, and predicting with the model.
 - **`loadData.py`:** Handles data loading, preprocessing, and dataset preparation.
