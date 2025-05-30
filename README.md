@@ -1,6 +1,6 @@
 # Graph Neural Network for Graph Classification
 ### Deep Learning Hackaton - La Sapienza, Roma
-**Giuseppe D'Addario** 2177530, **Lorenzo Benucci** 2219690.
+**Benucci Lorenzo** 2219690, **D'Addario Giuseppe** 2177530.
 
 ---
 
@@ -12,7 +12,7 @@ Initial experiments employed basic GIN models; however, both *accuracy* and *F1 
 
 
 <p align="center">
-  <img src="preview.jpg" alt="Descrizione" width="400">
+  <img src="teaser.png" alt="Procedure Teaser" width="816">
 </p>
 
 ## Models' details
@@ -55,6 +55,7 @@ Two distinct strategies are proposed:
 ## <u>GCOD</u>
 To mitigate overfitting due to noise, we found that using the **GCOD** loss instead of the standard *Cross-Entropy* significantly improves performance.
 
+---
 *   **How it works:**
     1.  Maintains a learnable parameter `u` for each training sample, representing the model's confidence that the sample is "clean".
     2.  Computes class `centroids` based on embeddings of (presumably) cleaner samples.
@@ -68,6 +69,7 @@ To mitigate overfitting due to noise, we found that using the **GCOD** loss inst
 
 ## Procedure
 
+---
 1. **Preprocessing Data:**
    - The datasets are loaded and preprocessed into graph structures.
    - Graphs are represented by node features, edge indices, and edge attributes.
@@ -90,6 +92,7 @@ To mitigate overfitting due to noise, we found that using the **GCOD** loss inst
 
 ## Code Structure
 
+---
 The script includes a `requirements.txt` containing all dependencies needed to run the code. Other files are organized as below:
 
 - **`main.py`:** The main script for training, evaluating, and predicting with the model.
