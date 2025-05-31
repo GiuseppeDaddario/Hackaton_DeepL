@@ -21,7 +21,7 @@ Two distinct strategies are proposed:
 
 * `GNN` model for C and D datasets
     
-* `GINE + transformer` model for A and B datasets
+* `GIN + transformer` model for A and B datasets
 ---
 
 
@@ -37,9 +37,9 @@ Two distinct strategies are proposed:
 
 
 
-*   **GINE + TRANSFORMER** [ *2xGIN → B.L.D. → TransConv → B.L.D. → 2xGIN → B.L.D. → Pooling → MLP*]
+*   **GIN + TRANSFORMER** [ *2xGIN → B.L.D. → TransConv → B.L.D. → 2xGIN → B.L.D. → Pooling → MLP*]
 
-    * **GINE** The GINE layers are fundamental for local neighborhood aggregation, capturing structural patterns around each node. Their strong discriminative power ensures that subtle topological differences across graphs are effectively encoded into the node and edge embeddings.
+    * **GIN** The GIN layers are fundamental for local neighborhood aggregation, capturing structural patterns around each node. Their strong discriminative power ensures that subtle topological differences across graphs are effectively encoded into the node and edge embeddings.
     * **B.L.D.** (***B**atchNorm-**L**eakyReLU-**D**ropout*) 
       * **BatchNorm** normalizes input embeddings increasing stability and training speed.
       * **Leaky ReLU** allows a small, non-zero gradient when the input is negative, helping to avoid the "dying neuron" problem.
