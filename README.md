@@ -7,7 +7,7 @@
 This project implements a framework for graph classification tasks under different type of label noise. It features **Graph Neural Network** (GNN) architectures, including **GNNtransformers** and the advanced loss function `GCOD`.  
 ## Overview of the Method
 
-Initial experiments employed basic GIN models; however, both *accuracy* and *F1 scores* remained low, indicating limited generalization capability. To address this, hybrid architectures combining **GIN** and **Transformer** layers were introduced, leading to substantial performance improvements on datasets C and D. Building on these results, a more sophisticated model was developed, integrating **GINEConv** and **Transformer** layers within a unified framework. This architecture also incorporated batch normalization, *LeakyReLU* activation, *dropout* for regularization, and a final *linear classifier*.
+Initial experiments employed basic GIN models; however, both *accuracy* and *F1 scores* remained low, indicating limited generalization capability. To address this, hybrid architectures combining **GIN** and **Transformer** layers were introduced, leading to substantial performance improvements on datasets C and D. Building on these results, a more sophisticated model was developed, integrating **GIN** and **Transformer** layers within a unified framework. This architecture also incorporated batch normalization, *LeakyReLU* activation, *dropout* for regularization, and a final *linear classifier*.
 
 
 
