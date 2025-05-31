@@ -13,7 +13,7 @@ from source.statistics import save_predictions, plot_training_progress, calculat
 from source.train import train_epoch
 from source.loadData import GraphDataset, AddNodeFeatures
 from source.loss import gcodLoss, LabelSmoothingCrossEntropy
-from source.models import GNN, GINEtrans
+from source.models import GNN, GINtrans
 from source.utils import set_seed
 
 set_seed()
@@ -103,7 +103,7 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
         logging.info(f"• Model architecture      : GNN+Transformer")
     elif args.gnn_type == 'GINEtrans':
         logging.info(f"Building GINEtrans...")
-        model = GINEtrans(
+        model = GINtrans(
             emb_dim=args.emb_dim,
             edge_input_dim=num_edge_features_resolved,
             num_classes=num_dataset_classes,
@@ -126,7 +126,10 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
 
     if os.path.exists(checkpoint_path_best) and not args.train_path:
         logging.info(f"Loading pre-trained model from {checkpoint_path_best}")
-        model.load_state_dict(torch.load(checkpoint_path_best, map_location=device))
+        checkpoint = torch.load(checkpoint_path_best, map_location=device)
+        state_dict = checkpoint.state_dict() if hasattr(checkpoint, 'state_dict') else checkpoint
+        model.load_state_dict(state_dict)
+        #model.load_state_dict(torch.load(checkpoint_path_best, map_location=device))
         logging.info("Model loaded successfully.")
 
     if args.num_checkpoints is not None and args.num_checkpoints > 0:
@@ -321,7 +324,10 @@ def main(args, full_train_dataset_outer=None, train_loader_outer=None, val_loade
             return
 
         logging.info(f">>> Loading model from {checkpoint_to_load_path} for prediction.")
-        model.load_state_dict(torch.load(checkpoint_to_load_path, map_location=device))
+        checkpoint = torch.load(checkpoint_to_load_path, map_location=device)
+        state_dict = checkpoint.state_dict() if hasattr(checkpoint, 'state_dict') else checkpoint
+        model.load_state_dict(state_dict)
+        #model.load_state_dict(torch.load(checkpoint_to_load_path, map_location=device))
         logging.info("Model loaded successfully for prediction.")
 
         logging.info(">>> Preparing test dataset...")

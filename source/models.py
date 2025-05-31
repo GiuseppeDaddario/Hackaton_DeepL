@@ -7,7 +7,7 @@ from torch_geometric.nn import global_mean_pool, global_add_pool, global_max_poo
 
 
 #Used for datasets C and D
-class TransformerConvBlock(torch.nn.Module):
+class TransBlock(torch.nn.Module):
     def __init__(self, emb_dim, num_heads=4, dropout_ratio=0.1, concat=True):
         super().__init__()
         self.emb_dim = emb_dim
@@ -18,7 +18,6 @@ class TransformerConvBlock(torch.nn.Module):
             self.att_out_channels = emb_dim // num_heads
         else:
             self.att_out_channels = emb_dim
-
 
         self.transformer_conv = TransformerConv(
             in_channels=emb_dim,
@@ -71,7 +70,7 @@ class GNN_node(torch.nn.Module):
 
         for layer in range(num_layer):
             if self.gnn_type == 'transformer':
-                self.convs.append(TransformerConvBlock(emb_dim, num_heads=transformer_heads, dropout_ratio=drop_ratio))
+                self.convs.append(TransBlock(emb_dim, num_heads=transformer_heads, dropout_ratio=drop_ratio))
             else:
                 raise ValueError('Undefined GNN type called {}'.format(gnn_type))
 
@@ -191,7 +190,7 @@ class GNN(torch.nn.Module):
 
 
 #Used for datasets A and B
-class GINConvE(MessagePassing):
+class EdgeGatedGIN(MessagePassing):
     def __init__(self, emb_dim, edge_input_dim=7, dropout_edge_mlp=0.2, dropout_out=0.2):
         super().__init__(aggr="add")
 
@@ -233,32 +232,31 @@ class GINConvE(MessagePassing):
     def update(self, aggr_out):
         return aggr_out
 
-class TransformerConvE(torch.nn.Module):
+class EdgeTrans(torch.nn.Module):
     def __init__(self, in_channels, emb_dim, heads=1, concat=True,
                  dropout_transformer=0.2, edge_input_dim=7, dropout_edge_mlp=0.2):
         super().__init__()
+
         self.in_channels = in_channels
         self.emb_dim = emb_dim
         self.heads = heads
         self.concat = concat
 
-        self.edge_encoder_output_dim = emb_dim
-
-        edge_encoder_layers = [
-            Linear(edge_input_dim, self.edge_encoder_output_dim),
+        # Encoder per gli attributi degli edge
+        self.edge_encoder = Sequential(
+            Linear(edge_input_dim, emb_dim),
             LeakyReLU(0.15),
-            Linear(self.edge_encoder_output_dim, self.edge_encoder_output_dim)
-        ]
-        if dropout_edge_mlp > 0:
-            edge_encoder_layers.append(torch.nn.Dropout(dropout_edge_mlp))
-        self.edge_encoder = Sequential(*edge_encoder_layers)
+            Linear(emb_dim, emb_dim),
+            Dropout(dropout_edge_mlp) if dropout_edge_mlp > 0 else torch.nn.Identity()
+        )
 
+        # Calcolo dimensioni di output del TransformerConv
         if concat:
             out_channels_per_head = emb_dim // heads
-            transformer_conv_output_dim = heads * out_channels_per_head
+            transformer_output_dim = heads * out_channels_per_head
         else:
             out_channels_per_head = emb_dim
-            transformer_conv_output_dim = emb_dim
+            transformer_output_dim = emb_dim
 
         self.transformer_conv = TransformerConv(
             in_channels=in_channels,
@@ -266,88 +264,118 @@ class TransformerConvE(torch.nn.Module):
             heads=heads,
             concat=concat,
             dropout=dropout_transformer,
-            edge_dim=self.edge_encoder_output_dim,
+            edge_dim=emb_dim,
             root_weight=True,
             beta=True
         )
 
-        if concat and transformer_conv_output_dim != emb_dim:
-            self.final_proj = Linear(transformer_conv_output_dim, emb_dim)
-        elif not concat and out_channels_per_head != emb_dim:
-            self.final_proj = Linear(out_channels_per_head, emb_dim)
+        # Proiezione finale (identità se non necessaria)
+        if transformer_output_dim != emb_dim:
+            self.final_proj = Linear(transformer_output_dim, emb_dim)
         else:
             self.final_proj = torch.nn.Identity()
 
-
     def forward(self, x, edge_index, edge_attr):
-        edge_embedding = self.edge_encoder(edge_attr)
-        out_transformer = self.transformer_conv(x, edge_index, edge_attr=edge_embedding)
-        out_projected = self.final_proj(out_transformer)
-        return out_projected
+        edge_emb = self.edge_encoder(edge_attr)
+        x = self.transformer_conv(x, edge_index, edge_attr=edge_emb)
+        x = self.final_proj(x)
+        return x
 
 
-class GINEtrans(torch.nn.Module):
+class GINtrans(torch.nn.Module):
     def __init__(self, emb_dim, edge_input_dim, num_classes, dropout=0.2):
         super().__init__()
+
         self.emb_dim = emb_dim
         self.edge_input_dim = edge_input_dim
+        self.input_proj = Linear(in_features=1, out_features=emb_dim)
 
-        self.input_proj = Linear(1, emb_dim)
+        # First GIN (2 layer)
+        self.gin_1 = torch.nn.ModuleList()
+        for _ in range(2):
+            self.gin_1.append(
+                EdgeGatedGIN(
+                    emb_dim=emb_dim,
+                    edge_input_dim=self.edge_input_dim,
+                    dropout_edge_mlp=dropout,
+                    dropout_out=dropout
+                )
+            )
+        self.bn1 = BatchNorm1d(num_features=emb_dim)
 
-        self.gin_block1 = torch.nn.ModuleList([
-            GINConvE(emb_dim, self.edge_input_dim, dropout_edge_mlp=dropout, dropout_out=dropout)
+        # Transformer
+        self.transformer1 = EdgeTrans(
+            in_channels=emb_dim,
+            emb_dim=emb_dim,
+            heads=2,
+            concat=True,
+            dropout_transformer=dropout,
+            edge_input_dim=edge_input_dim,
+            dropout_edge_mlp=dropout
+        )
+        self.bn_transformer1 = BatchNorm1d(num_features=emb_dim)
+
+        # Second GIN (2 layer)
+        self.gin_2 = torch.nn.ModuleList([
+            EdgeGatedGIN(
+                emb_dim=emb_dim,
+                edge_input_dim=edge_input_dim,
+                dropout_edge_mlp=dropout,
+                dropout_out=dropout
+            )
             for _ in range(2)
         ])
-        self.bn1 = BatchNorm1d(emb_dim)
+        self.bn2 = BatchNorm1d(num_features=emb_dim)
 
-        self.transformer1 = TransformerConvE(emb_dim, emb_dim, heads=2, concat=True,
-                                             dropout_transformer=dropout, edge_input_dim=edge_input_dim, dropout_edge_mlp=dropout)
-        self.bn_transformer1 = BatchNorm1d(emb_dim)
-
-        self.gin_block2 = torch.nn.ModuleList([
-            GINConvE(emb_dim, edge_input_dim, dropout_edge_mlp=dropout, dropout_out=dropout)
-            for _ in range(2)
-        ])
-        self.bn2 = BatchNorm1d(emb_dim)
-
+        # Pooling
         self.pool = global_mean_pool
-        self.classifier = Sequential(
+
+        # MLP
+        self.MLPcla = Sequential(
             Linear(emb_dim, emb_dim // 2),
-            LeakyReLU(0.15),
-            Dropout(dropout),
+            LeakyReLU(negative_slope=0.15),
+            Dropout(p=dropout),
             Linear(emb_dim // 2, num_classes)
         )
-        self.dropout_final_nodes = Dropout(dropout)
+
+        # Dropout
+        self.dropout_final_nodes = Dropout(p=dropout)
 
     def forward(self, data):
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
 
+        # Init of x
         if x is None:
-            num_nodes = data.num_nodes
-            x = torch.zeros((num_nodes, 1), device=edge_index.device if edge_index is not None else (batch.device if batch is not None else 'cpu'))
+            device = edge_index.device if edge_index is not None else (batch.device if batch is not None else 'cpu')
+            x = torch.zeros((data.num_nodes, 1), device=device)
 
         x = self.input_proj(x)
 
-        for conv_layer in self.gin_block1:
-            x = conv_layer(x, edge_index, edge_attr)
+        # First GIN
+        for conv in self.gin_1:
+            x = conv(x, edge_index, edge_attr)
         x = self.bn1(x)
         x = F.leaky_relu(x, negative_slope=0.15)
         x = self.dropout_final_nodes(x)
 
-        residual_pre_transformer = x
+        # Transformer
+        residual = x
         x = self.transformer1(x, edge_index, edge_attr)
         x = self.bn_transformer1(x)
         x = F.leaky_relu(x, negative_slope=0.15)
         x = self.dropout_final_nodes(x)
-        x = x + residual_pre_transformer
+        x = x + residual
 
-        for conv_layer in self.gin_block2:
-            x = conv_layer(x, edge_index, edge_attr)
+        # Second GIN
+        for conv in self.gin_2:
+            x = conv(x, edge_index, edge_attr)
         x = self.bn2(x)
-        x_node_embeddings_final = F.leaky_relu(x, negative_slope=0.15)
-        x_node_embeddings_final = self.dropout_final_nodes(x_node_embeddings_final)
-        graph_embeddings = self.pool(x_node_embeddings_final, batch)
-        logits = self.classifier(graph_embeddings)
+        x = F.leaky_relu(x, negative_slope=0.15)
+        x = self.dropout_final_nodes(x)
+
+        # Pooling and MLP
+        graph_embeddings = self.pool(x, batch)
+        logits = self.MLPcla(graph_embeddings)
 
         return logits, graph_embeddings
 

@@ -26,7 +26,7 @@ Two distinct strategies are proposed:
 
 
 *   **GNN** [ *N.E → E.E. → TransConv → LeakyReLU → Dropout → Residual → Pooling → MLP*]
-    * **GINConvE** layers followed by batch normalization and LeakyReLU activation, capturing local neighborhood structures.
+    * **GIN** layers followed by batch normalization and LeakyReLU activation, capturing local neighborhood structures.
       After transformer, there are still two of these layers to refine the representation of graphs.
     * **Mean pooling** layer to aggregate node embeddings.
     * `TransformerConvBlock`, which forms the core of the model, is a graph convolutional layer based on the transformer architecture with a self-attention mechanism. This design enables it to capture complex, long-range dependencies between nodes in the graph, allowing the network to model global context and interactions beyond immediate neighbors. As a result, it significantly enhances the expressiveness of the node representations.
@@ -105,7 +105,8 @@ The script includes a `requirements.txt` containing all dependencies needed to r
 - **`statistics.py`:** Contains functions to compute and report statistical metrics and performance summaries.
 
 ---
-
+## References
+- wani et al. (2024): Robustness of Graph Classification: failure modes, causes, and noise-resistant loss in Graph Neural Networks
 
 
 
